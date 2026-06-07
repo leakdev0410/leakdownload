@@ -165,14 +165,6 @@ func (a *App) clipboardWatcher() {
 	}
 }
 
-// getClipboardText đọc clipboard bằng Windows API (không spawn cửa sổ).
-func getClipboardText() string {
-	if runtime.GOOS != "windows" {
-		return ""
-	}
-	return readClipboardWindows()
-}
-
 // ---- cấu hình / lưu phiên ----
 
 // startCatchServer chạy HTTP server local nhận link tải từ Chrome extension.

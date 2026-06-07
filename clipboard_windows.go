@@ -23,7 +23,7 @@ const (
 	cfText        = 1
 )
 
-func readClipboardWindows() string {
+func getClipboardText() string {
 	// Mở clipboard
 	r, _, _ := procOpenClipboard.Call(0)
 	if r == 0 {
