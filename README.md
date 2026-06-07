@@ -1,13 +1,11 @@
 # Leakdownload
 
-Leakdownload là một trình quản lý tải xuống đa năng hỗ trợ tải file thông thường (HTTP) và Torrent, được xây dựng bằng Go và Wails. Dự án tập trung vào tính hiệu quả, ổn định và sử dụng tài nguyên hệ thống ở mức thấp.
+Leakdownload là một trình quản lý tải xuống Torrent, được xây dựng bằng Go và Wails. Dự án tập trung vào tính hiệu quả, ổn định và sử dụng tài nguyên hệ thống ở mức thấp.
 
 ## Tính năng
 
 *   **Tải Torrent**: Hỗ trợ Magnet Link và `.torrent` files với tốc độ cao, hỗ trợ DHT và tracker tùy chỉnh.
-*   **Tải HTTP**: Bắt link trực tiếp và tải xuống.
 *   **Tích hợp Clipboard**: Tự động nhận diện và bắt link `.torrent` từ clipboard.
-*   **Tiện ích mở rộng Chrome**: Bắt link trực tiếp thông qua Catch Server local tại cổng `19876`.
 *   **Tùy biến tốc độ**: Giới hạn tốc độ tải xuống/tải lên.
 *   **Quản lý tệp**: Đặt độ ưu tiên cho các tệp trong một torrent, tạm dừng, tiếp tục.
 
