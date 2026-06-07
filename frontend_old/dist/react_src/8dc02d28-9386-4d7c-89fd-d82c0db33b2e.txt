@@ -1,0 +1,173 @@
+// app.jsx — torrnet main application. Composes everything + tweaks.
+(function () {
+  const { useState, useEffect, useRef, useMemo } = React;
+  const {
+    TORRENTS, stepTorrent, fmtSpeed,
+    TorrentTable, NavItems, Brand, DetailPanel, AddModal, StatusBar, Toolbar,
+    useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakToggle, TweakColor,
+    Icon,
+  } = window;
+
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "layout": "sidebar",
+    "dark": false,
+    "accent": "#E76A2E",
+    "density": "comfortable",
+    "progress": "bar"
+  }/*EDITMODE-END*/;
+
+  const ACCENTS = ["#E76A2E", "#00ADD8", "#7A5AE0", "#1f9e8f"];
+  const MAXH = 40; // chart history points
+
+  function App() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+    const [torrents, setTorrents] = useState(() => TORRENTS.map((x) => ({ ...x })));
+    const [selId, setSelId] = useState("t1");
+    const [filter, setFilter] = useState("all");
+    const [query, setQuery] = useState("");
+    const [addOpen, setAddOpen] = useState(false);
+    const [globalHist, setGlobalHist] = useState([]);
+    const histRef = useRef({}); // per-torrent history
+
+    // live simulation tick
+    useEffect(() => {
+      const iv = setInterval(() => {
+        setTorrents((prev) => prev.map((tr) => {
+          const upd = stepTorrent(tr);
+          const next = { ...tr, ...upd };
+          const h = histRef.current[tr.id] || [];
+          h.push({ d: next.down || 0, u: next.up || 0 });
+          if (h.length > MAXH) h.shift();
+          histRef.current[tr.id] = h;
+          return next;
+        }));
+      }, 1000);
+      return () => clearInterval(iv);
+    }, []);
+
+    // global history derived each tick
+    useEffect(() => {
+      const totD = torrents.reduce((s, x) => s + (x.down || 0), 0);
+      const totU = torrents.reduce((s, x) => s + (x.up || 0), 0);
+      setGlobalHist((h) => {
+        const n = [...h, { d: totD, u: totU }];
+        return n.length > MAXH ? n.slice(-MAXH) : n;
+      });
+    }, [torrents]);
+
+    // apply theme + accent to :root
+    useEffect(() => {
+      const r = document.documentElement;
+      r.dataset.theme = t.dark ? "dark" : "light";
+      r.style.setProperty("--accent", t.accent);
+    }, [t.dark, t.accent]);
+
+    function action(id, kind) {
+      if (kind === "remove") {
+        setTorrents((p) => p.filter((x) => x.id !== id));
+        if (selId === id) setSelId(null);
+        return;
+      }
+      setTorrents((p) => p.map((x) => {
+        if (x.id !== id) return x;
+        if (kind === "pause") return { ...x, status: "paused", down: 0, up: 0 };
+        if (kind === "resume") return { ...x, status: x.progress >= 1 ? "seeding" : "downloading" };
+        return x;
+      }));
+    }
+    const pauseAll = () => setTorrents((p) => p.map((x) => x.status === "downloading" || x.status === "seeding" || x.status === "queued" ? { ...x, status: "paused", down: 0, up: 0 } : x));
+    const resumeAll = () => setTorrents((p) => p.map((x) => x.status === "paused" ? { ...x, status: x.progress >= 1 ? "seeding" : "downloading" } : x));
+
+    function addTorrent({ mode, fileName }) {
+      const name = mode === "file" ? fileName.replace(/\.torrent$/i, "") : "Magnet torrent — đang lấy metadata...";
+      const id = "t" + Date.now();
+      const nt = {
+        id, name, category: "software", size: (1 + Math.random() * 6) * 1024 ** 3,
+        progress: 0, status: "downloading", down: 0, up: 0, peers: 3, seeds: 5, ratio: 0,
+        added: "vừa xong", hash: Array.from({ length: 40 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join(""),
+        files: [{ path: name + "/data.bin", size: (1 + Math.random() * 6) * 1024 ** 3, prog: 0, prio: "normal" }],
+      };
+      setTorrents((p) => [nt, ...p]);
+      setSelId(id);
+    }
+
+    // filtering
+    const visible = useMemo(() => torrents.filter((tr) => {
+      if (filter === "downloading" && tr.status !== "downloading") return false;
+      if (filter === "seeding" && tr.status !== "seeding") return false;
+      if (filter === "completed" && !(tr.status === "completed" || tr.status === "seeding")) return false;
+      if (filter === "paused" && tr.status !== "paused") return false;
+      if (query && !tr.name.toLowerCase().includes(query.toLowerCase())) return false;
+      return true;
+    }), [torrents, filter, query]);
+
+    const counts = useMemo(() => ({
+      all: torrents.length,
+      downloading: torrents.filter((x) => x.status === "downloading").length,
+      seeding: torrents.filter((x) => x.status === "seeding").length,
+      completed: torrents.filter((x) => x.status === "completed" || x.status === "seeding").length,
+      paused: torrents.filter((x) => x.status === "paused").length,
+    }), [torrents]);
+
+    const totalDown = torrents.reduce((s, x) => s + (x.down || 0), 0);
+    const totalUp = torrents.reduce((s, x) => s + (x.up || 0), 0);
+    const activeN = torrents.filter((x) => x.status === "downloading" || x.status === "seeding").length;
+    const connections = torrents.reduce((s, x) => s + (x.peers || 0), 0);
+
+    const selected = torrents.find((x) => x.id === selId) || null;
+    const selHist = (selId && histRef.current[selId]) || [];
+
+    const isTop = t.layout === "topbar";
+
+    return (
+      <div className={"app " + (isTop ? "lay-top" : "lay-side")}>
+        {/* Navigation */}
+        {isTop ? (
+          <header className="topbar">
+            <Brand />
+            <NavItems active={filter} onNav={setFilter} counts={counts} vertical={false} />
+            <div className="top-mini mono"><span className="dl">↓ {fmtSpeed(totalDown)}</span><span className="ul">↑ {fmtSpeed(totalUp)}</span></div>
+          </header>
+        ) : (
+          <aside className="sidebar">
+            <Brand />
+            <NavItems active={filter} onNav={setFilter} counts={counts} vertical={true} />
+            <div className="side-foot">
+              <div className="mini-speed"><span className="dl"><Icon name="download" size={13} /> {fmtSpeed(totalDown)}</span><span className="ul"><Icon name="upload" size={13} /> {fmtSpeed(totalUp)}</span></div>
+            </div>
+          </aside>
+        )}
+
+        {/* Main column */}
+        <div className="main">
+          <Toolbar query={query} onQuery={setQuery} onAdd={() => setAddOpen(true)} onPauseAll={pauseAll} onResumeAll={resumeAll} />
+          <div className="content">
+            <div className="list-wrap">
+              {visible.length ? (
+                <TorrentTable torrents={visible} selectedId={selId} onSelect={setSelId} onAction={action} density={t.density} progressStyle={t.progress} />
+              ) : (
+                <div className="empty"><Icon name="search" size={28} /><p>Không có torrent nào khớp.</p></div>
+              )}
+            </div>
+            {selected && <DetailPanel torrent={selected} history={selHist} accent={t.accent} onClose={() => setSelId(null)} />}
+          </div>
+          <StatusBar totalDown={totalDown} totalUp={totalUp} active={activeN} connections={connections} dht={"3,841"} />
+        </div>
+
+        <AddModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addTorrent} />
+
+        <TweaksPanel>
+          <TweakSection label="Bố cục" />
+          <TweakRadio label="Layout" value={t.layout} options={["sidebar", "topbar"]} onChange={(v) => setTweak("layout", v)} />
+          <TweakRadio label="Mật độ" value={t.density} options={["compact", "comfortable"]} onChange={(v) => setTweak("density", v)} />
+          <TweakRadio label="Kiểu tiến trình" value={t.progress} options={["bar", "ring", "striped"]} onChange={(v) => setTweak("progress", v)} />
+          <TweakSection label="Giao diện" />
+          <TweakToggle label="Chế độ tối" value={t.dark} onChange={(v) => setTweak("dark", v)} />
+          <TweakColor label="Màu nhấn" value={t.accent} options={ACCENTS} onChange={(v) => setTweak("accent", v)} />
+        </TweaksPanel>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+})();

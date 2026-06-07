@@ -1,0 +1,196 @@
+// data.jsx — mock torrent data + live simulation helpers for torrnet
+// Exports to window: TORRENTS, makeFileTree, makePeers, makeTrackers,
+//   fmtBytes, fmtSpeed, fmtEta, stepTorrent, CLIENTS, COUNTRIES
+
+(function () {
+  const GiB = 1024 * 1024 * 1024;
+  const MiB = 1024 * 1024;
+
+  function fmtBytes(b) {
+    if (b == null) return "—";
+    if (b >= GiB) return (b / GiB).toFixed(2) + " GB";
+    if (b >= MiB) return (b / MiB).toFixed(1) + " MB";
+    if (b >= 1024) return (b / 1024).toFixed(0) + " KB";
+    return b + " B";
+  }
+  function fmtSpeed(bps) {
+    if (!bps) return "0 KB/s";
+    if (bps >= MiB) return (bps / MiB).toFixed(1) + " MB/s";
+    if (bps >= 1024) return (bps / 1024).toFixed(0) + " KB/s";
+    return bps + " B/s";
+  }
+  function fmtEta(sec) {
+    if (sec == null || sec === Infinity) return "∞";
+    if (sec <= 0) return "—";
+    if (sec < 60) return Math.round(sec) + "s";
+    if (sec < 3600) return Math.floor(sec / 60) + "m " + Math.round(sec % 60) + "s";
+    if (sec < 86400) return Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
+    return Math.floor(sec / 86400) + "d " + Math.floor((sec % 86400) / 3600) + "h";
+  }
+
+  const CLIENTS = ["qBittorrent 4.6", "Transmission 4.0", "Deluge 2.1", "libtorrent 2.0", "µTorrent 3.5", "Vuze 5.7", "BiglyBT 3.4"];
+  const COUNTRIES = ["🇺🇸 US", "🇩🇪 DE", "🇯🇵 JP", "🇳🇱 NL", "🇸🇪 SE", "🇫🇷 FR", "🇨🇦 CA", "🇬🇧 GB", "🇧🇷 BR", "🇰🇷 KR", "🇦🇺 AU", "🇮🇳 IN"];
+
+  // category: video | audio | software | docs | game
+  const TORRENTS = [
+    {
+      id: "t1", name: "Blender Open Movie — Spring (2160p HDR)", category: "video",
+      size: 8.4 * GiB, progress: 0.62, status: "downloading",
+      down: 11.2 * MiB, up: 420 * 1024, peers: 34, seeds: 18, ratio: 0.31,
+      added: "2d ago", hash: "a3f9c1e7b2d84f06a1c9e3b7d50f8a26c4e1b9d3",
+      files: [
+        { path: "Spring/Spring_2160p_HDR.mkv", size: 7.9 * GiB, prog: 0.61, prio: "high" },
+        { path: "Spring/subs/Spring.en.srt", size: 88 * 1024, prog: 1, prio: "normal" },
+        { path: "Spring/subs/Spring.vi.srt", size: 92 * 1024, prog: 1, prio: "normal" },
+        { path: "Spring/poster.jpg", size: 2.4 * MiB, prog: 1, prio: "normal" },
+        { path: "Spring/README.txt", size: 4 * 1024, prog: 1, prio: "low" },
+      ],
+    },
+    {
+      id: "t2", name: "Ubuntu 24.04.1 LTS Desktop amd64", category: "software",
+      size: 5.7 * GiB, progress: 1, status: "seeding",
+      down: 0, up: 2.1 * MiB, peers: 96, seeds: 0, ratio: 3.84,
+      added: "8d ago", hash: "f1207b9ac6e3d4582019fbac7e6d5031a8c2f4e9",
+      files: [
+        { path: "ubuntu-24.04.1-desktop-amd64.iso", size: 5.7 * GiB, prog: 1, prio: "normal" },
+        { path: "SHA256SUMS", size: 1.2 * 1024, prog: 1, prio: "normal" },
+        { path: "SHA256SUMS.gpg", size: 833, prog: 1, prio: "normal" },
+      ],
+    },
+    {
+      id: "t3", name: "Cosmos Lab — Field Recordings Vol. 3 (FLAC)", category: "audio",
+      size: 1.2 * GiB, progress: 0.27, status: "downloading",
+      down: 3.4 * MiB, up: 180 * 1024, peers: 12, seeds: 7, ratio: 0.08,
+      added: "5h ago", hash: "9b3e7d1f4a8c2056e9d7b3f1a6c08e24d5b9f7a1",
+      files: [
+        { path: "Vol3/01 — Glacier Melt.flac", size: 142 * MiB, prog: 1, prio: "high" },
+        { path: "Vol3/02 — Tidal Drift.flac", size: 168 * MiB, prog: 0.8, prio: "high" },
+        { path: "Vol3/03 — Aurora Hum.flac", size: 155 * MiB, prog: 0.1, prio: "normal" },
+        { path: "Vol3/04 — Deep Forest.flac", size: 190 * MiB, prog: 0, prio: "normal" },
+        { path: "Vol3/05 — Static Bloom.flac", size: 201 * MiB, prog: 0, prio: "normal" },
+        { path: "Vol3/cover.png", size: 8.4 * MiB, prog: 0, prio: "low" },
+      ],
+    },
+    {
+      id: "t4", name: "Godot Engine 4.3 — Source + Demos", category: "game",
+      size: 2.9 * GiB, progress: 0.94, status: "downloading",
+      down: 6.8 * MiB, up: 920 * 1024, peers: 21, seeds: 30, ratio: 1.12,
+      added: "1d ago", hash: "c5a91f3e7b6d20489f1c3a7e5d9b08f24a6c1e93",
+      files: [
+        { path: "godot-4.3/source.zip", size: 1.4 * GiB, prog: 1, prio: "high" },
+        { path: "godot-4.3/demos.zip", size: 1.1 * GiB, prog: 0.9, prio: "normal" },
+        { path: "godot-4.3/docs.pdf", size: 410 * MiB, prog: 0.86, prio: "normal" },
+      ],
+    },
+    {
+      id: "t5", name: "Public Domain Archive — Jazz 1920-1929", category: "audio",
+      size: 980 * MiB, progress: 1, status: "completed",
+      down: 0, up: 0, peers: 0, seeds: 0, ratio: 2.05,
+      added: "21d ago", hash: "7e2d9f1a4c8b3056d1e9f7a3b6c20e84f5a9d1c7",
+      files: [
+        { path: "Jazz1920s/disc1.flac", size: 480 * MiB, prog: 1, prio: "normal" },
+        { path: "Jazz1920s/disc2.flac", size: 500 * MiB, prog: 1, prio: "normal" },
+      ],
+    },
+    {
+      id: "t6", name: "Wikipedia EN — Articles Dump (2026-05)", category: "docs",
+      size: 22 * GiB, progress: 0.08, status: "paused",
+      down: 0, up: 0, peers: 0, seeds: 41, ratio: 0.01,
+      added: "3h ago", hash: "1f8c3e7a9d2b4056f3a1c9e7d5b08f26a4c1e9b3",
+      files: [
+        { path: "enwiki-20260501-pages-articles.xml.bz2", size: 22 * GiB, prog: 0.08, prio: "normal" },
+      ],
+    },
+    {
+      id: "t7", name: "Krita 5.2 AppImage + Brush Packs", category: "software",
+      size: 640 * MiB, progress: 0.45, status: "downloading",
+      down: 2.2 * MiB, up: 64 * 1024, peers: 8, seeds: 5, ratio: 0.04,
+      added: "1h ago", hash: "b9d1f7e3a5c8204619f3c7a1e9d5b08f4a6c2e91",
+      files: [
+        { path: "krita-5.2.0-x86_64.appimage", size: 280 * MiB, prog: 0.9, prio: "high" },
+        { path: "brushes/digital-pack.bundle", size: 210 * MiB, prog: 0.2, prio: "normal" },
+        { path: "brushes/ink-pack.bundle", size: 150 * MiB, prog: 0, prio: "normal" },
+      ],
+    },
+    {
+      id: "t8", name: "Big Buck Bunny — 60fps Master (ProRes)", category: "video",
+      size: 14.6 * GiB, progress: 0.015, status: "queued",
+      down: 0, up: 0, peers: 0, seeds: 12, ratio: 0,
+      added: "12m ago", hash: "3a7c1e9f5b2d8046a1c3e7f9d5b08c24e6a1f9b3",
+      files: [
+        { path: "BBB/master_prores.mov", size: 14.6 * GiB, prog: 0.015, prio: "normal" },
+      ],
+    },
+  ];
+
+  function makePeers(t) {
+    const n = t.status === "downloading" || t.status === "seeding" ? Math.max(t.peers, 6) : 0;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const seg = () => Math.floor(Math.random() * 255);
+      out.push({
+        ip: `${seg()}.${seg()}.${seg()}.${seg()}`,
+        country: COUNTRIES[i % COUNTRIES.length],
+        client: CLIENTS[Math.floor(Math.random() * CLIENTS.length)],
+        prog: Math.random(),
+        down: Math.random() > 0.4 ? Math.floor(Math.random() * 3 * MiB) : 0,
+        up: Math.random() > 0.5 ? Math.floor(Math.random() * 800 * 1024) : 0,
+        flags: Math.random() > 0.6 ? "↑↓ E" : "↓",
+      });
+    }
+    return out;
+  }
+
+  function makeTrackers(t) {
+    const base = [
+      { url: "udp://tracker.opentrackr.org:1337/announce", status: "working" },
+      { url: "udp://open.demonii.com:1337/announce", status: "working" },
+      { url: "udp://tracker.torrent.eu.org:451/announce", status: "working" },
+      { url: "http://retracker.local/announce", status: "not working" },
+      { url: "[DHT]", status: "working" },
+      { url: "[PeX]", status: "working" },
+      { url: "[LSD]", status: "working" },
+    ];
+    return base.map((b) => ({
+      ...b,
+      seeds: b.status === "working" && t.progress < 1 ? Math.floor(Math.random() * 40) + t.seeds : (b.url.startsWith("[") ? "—" : 0),
+      peers: b.status === "working" ? Math.floor(Math.random() * 60) + t.peers : 0,
+      leeches: b.status === "working" ? Math.floor(Math.random() * 30) : 0,
+    }));
+  }
+
+  // advance a torrent one tick (~1s); returns new partial fields
+  function stepTorrent(t) {
+    if (t.status !== "downloading" && t.status !== "seeding") {
+      return { down: 0, up: 0 };
+    }
+    if (t.status === "seeding") {
+      const up = (1.5 + Math.random() * 2.5) * MiB;
+      return { up, down: 0, ratio: +(t.ratio + up / t.size * 0.01).toFixed(2) };
+    }
+    // downloading
+    const jitter = 0.6 + Math.random() * 0.8;
+    const down = Math.min((8 + Math.random() * 6) * MiB, 18 * MiB) * jitter;
+    const up = (0.2 + Math.random() * 0.5) * MiB;
+    let progress = t.progress + down / t.size;
+    let status = t.status;
+    if (progress >= 1) {
+      progress = 1;
+      status = "seeding";
+    }
+    return {
+      down: progress >= 1 ? 0 : down,
+      up,
+      progress,
+      status,
+      ratio: +(t.ratio + up / t.size).toFixed(2),
+      peers: Math.max(2, t.peers + Math.round((Math.random() - 0.5) * 4)),
+      seeds: Math.max(0, t.seeds + Math.round((Math.random() - 0.5) * 3)),
+    };
+  }
+
+  Object.assign(window, {
+    TORRENTS, makePeers, makeTrackers, stepTorrent,
+    fmtBytes, fmtSpeed, fmtEta, CLIENTS, COUNTRIES,
+  });
+})();

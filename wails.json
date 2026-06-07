@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "leakdownload",
+  "outputfilename": "leakdownload",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dir": "frontend",
+  "wailsjsdir": "./frontend/src",
+  "author": {
+    "name": "Quân"
+  },
+  "info": {
+    "productName": "leakdownload",
+    "comments": "Trình tải file đa năng (torrent + HTTP) viết bằng Go + Wails"
+  }
+}

@@ -1,0 +1,258 @@
+// detail.jsx — torrent detail panel, add-torrent modal, global status bar.
+// Exports DetailPanel, AddModal, StatusBar, Toolbar to window.
+(function () {
+  const { useState, useMemo } = React;
+  const { Icon, SpeedChart, fmtBytes, fmtSpeed, fmtEta, makePeers, makeTrackers, StatusPill, ProgressView } = window;
+
+  // ── Detail panel ─────────────────────────────────────────────────
+  function DetailPanel({ torrent, history, accent, onClose }) {
+    const [tab, setTab] = useState("files");
+    const peers = useMemo(() => (torrent ? makePeers(torrent) : []), [torrent && torrent.id]);
+    const trackers = useMemo(() => (torrent ? makeTrackers(torrent) : []), [torrent && torrent.id]);
+    if (!torrent) return null;
+    const t = torrent;
+    const eta = t.status === "downloading" && t.down > 0 ? (t.size * (1 - t.progress)) / t.down : (t.progress >= 1 ? 0 : Infinity);
+
+    const TABS = [
+      { id: "files", label: "Tệp tin", icon: "folder", n: t.files.length },
+      { id: "peers", label: "Peers", icon: "peers", n: peers.length },
+      { id: "trackers", label: "Trackers", icon: "globe", n: trackers.length },
+      { id: "info", label: "Thông tin", icon: "info" },
+    ];
+
+    return (
+      <aside className="detail">
+        <header className="detail-head">
+          <div className="detail-title">
+            <span className="cat-ico lg"><Icon name="file" size={18} /></span>
+            <div>
+              <div className="detail-name" title={t.name}>{t.name}</div>
+              <div className="detail-sub mono">{fmtBytes(t.size)} · <StatusPill status={t.status} /></div>
+            </div>
+          </div>
+          <button className="ibtn" onClick={onClose} title="Đóng"><Icon name="close" size={18} /></button>
+        </header>
+
+        <div className="detail-progress">
+          <ProgressView value={t.progress} status={t.status} style="bar" size="lg" />
+          <div className="dp-stats">
+            <span className="mono">{Math.round(t.progress * 100)}%</span>
+            <span>·</span>
+            <span className="mono">{fmtBytes(t.size * t.progress)} / {fmtBytes(t.size)}</span>
+            {t.status === "downloading" && <><span>·</span><span className="mono">còn {fmtEta(eta)}</span></>}
+          </div>
+        </div>
+
+        <div className="detail-kpis">
+          <KPI icon="download" label="Tốc độ tải" value={fmtSpeed(t.down)} color="var(--accent)" />
+          <KPI icon="upload" label="Tốc độ lên" value={fmtSpeed(t.up)} color="var(--up)" />
+          <KPI icon="peers" label="Peers / Seeds" value={`${t.peers} / ${t.seeds}`} />
+          <KPI icon="seed" label="Tỷ lệ chia sẻ" value={t.ratio.toFixed(2)} color={t.ratio >= 1 ? "var(--up)" : undefined} />
+        </div>
+
+        <div className="detail-chart">
+          <div className="chart-legend">
+            <span><i style={{ background: accent }} /> Tải xuống</span>
+            <span><i style={{ background: "var(--up)" }} /> Tải lên</span>
+          </div>
+          <SpeedChart history={history} accent={accent} height={108} />
+        </div>
+
+        <div className="tabs">
+          {TABS.map((tb) => (
+            <button key={tb.id} className={"tab" + (tab === tb.id ? " active" : "")} onClick={() => setTab(tb.id)}>
+              <Icon name={tb.icon} size={15} />{tb.label}{tb.n != null && <span className="tab-n mono">{tb.n}</span>}
+            </button>
+          ))}
+        </div>
+
+        <div className="tab-body">
+          {tab === "files" && <FilesTab files={t.files} />}
+          {tab === "peers" && <PeersTab peers={peers} />}
+          {tab === "trackers" && <TrackersTab trackers={trackers} />}
+          {tab === "info" && <InfoTab t={t} />}
+        </div>
+      </aside>
+    );
+  }
+
+  function KPI({ icon, label, value, color }) {
+    return (
+      <div className="kpi">
+        <span className="kpi-ico" style={color ? { color } : undefined}><Icon name={icon} size={15} /></span>
+        <div>
+          <div className="kpi-val mono" style={color ? { color } : undefined}>{value}</div>
+          <div className="kpi-lbl">{label}</div>
+        </div>
+      </div>
+    );
+  }
+
+  function FilesTab({ files }) {
+    return (
+      <table className="subtable">
+        <thead><tr><th>Tệp</th><th style={{ textAlign: "right" }}>Cỡ</th><th style={{ width: 120 }}>Tiến trình</th><th>Ưu tiên</th></tr></thead>
+        <tbody>
+          {files.map((f, i) => (
+            <tr key={i}>
+              <td className="ft-name"><Icon name="file" size={14} /><span title={f.path}>{f.path.split("/").pop()}</span></td>
+              <td className="mono num">{fmtBytes(f.size)}</td>
+              <td><div className="bar bar-sm"><div className="bar-fill" style={{ width: f.prog * 100 + "%", background: f.prog >= 1 ? "var(--up)" : "var(--accent)" }} /></div></td>
+              <td><span className={"prio prio-" + f.prio}>{f.prio === "high" ? "Cao" : f.prio === "low" ? "Thấp" : "Thường"}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
+  function PeersTab({ peers }) {
+    if (!peers.length) return <div className="empty-sm">Không có peer nào đang kết nối.</div>;
+    return (
+      <table className="subtable">
+        <thead><tr><th>Địa chỉ IP</th><th>Quốc gia</th><th>Client</th><th style={{ width: 90 }}>%</th><th style={{ textAlign: "right" }}>↓</th><th style={{ textAlign: "right" }}>↑</th></tr></thead>
+        <tbody>
+          {peers.map((p, i) => (
+            <tr key={i}>
+              <td className="mono">{p.ip}</td>
+              <td className="flag">{p.country}</td>
+              <td className="client">{p.client}</td>
+              <td><div className="bar bar-sm"><div className="bar-fill" style={{ width: p.prog * 100 + "%", background: "var(--accent)" }} /></div></td>
+              <td className="mono num dl">{p.down ? fmtSpeed(p.down) : "—"}</td>
+              <td className="mono num ul">{p.up ? fmtSpeed(p.up) : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
+  function TrackersTab({ trackers }) {
+    return (
+      <table className="subtable">
+        <thead><tr><th>URL</th><th>Trạng thái</th><th style={{ textAlign: "right" }}>Seeds</th><th style={{ textAlign: "right" }}>Peers</th><th style={{ textAlign: "right" }}>Leech</th></tr></thead>
+        <tbody>
+          {trackers.map((t, i) => (
+            <tr key={i}>
+              <td className="mono tk-url" title={t.url}>{t.url}</td>
+              <td><span className={"tk-status " + (t.status === "working" ? "ok" : "bad")}>{t.status === "working" ? "Hoạt động" : "Lỗi"}</span></td>
+              <td className="mono num">{t.seeds}</td>
+              <td className="mono num">{t.peers}</td>
+              <td className="mono num">{t.leeches}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
+  function InfoTab({ t }) {
+    const rows = [
+      ["Tên", t.name],
+      ["Info hash (v1)", t.hash],
+      ["Tổng dung lượng", fmtBytes(t.size)],
+      ["Đã tải", fmtBytes(t.size * t.progress)],
+      ["Đã chia sẻ", fmtBytes(t.size * t.ratio)],
+      ["Số tệp", t.files.length + " tệp"],
+      ["Thêm vào", t.added],
+      ["Lưu tại", "~/Downloads/torrnet/"],
+    ];
+    return (
+      <div className="info-grid">
+        {rows.map(([k, v], i) => (
+          <div className="info-row" key={i}><div className="info-k">{k}</div><div className="info-v mono" title={v}>{v}</div></div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── Add torrent modal ────────────────────────────────────────────
+  function AddModal({ open, onClose, onAdd }) {
+    const [mode, setMode] = useState("magnet");
+    const [magnet, setMagnet] = useState("");
+    const [drag, setDrag] = useState(false);
+    const [fileName, setFileName] = useState("");
+    if (!open) return null;
+    const valid = mode === "magnet" ? magnet.trim().startsWith("magnet:") : !!fileName;
+    return (
+      <div className="modal-scrim" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <header className="modal-head">
+            <h3>Thêm torrent mới</h3>
+            <button className="ibtn" onClick={onClose}><Icon name="close" size={18} /></button>
+          </header>
+          <div className="seg">
+            <button className={mode === "magnet" ? "on" : ""} onClick={() => setMode("magnet")}><Icon name="magnet" size={15} /> Magnet link</button>
+            <button className={mode === "file" ? "on" : ""} onClick={() => setMode("file")}><Icon name="file" size={15} /> Tệp .torrent</button>
+          </div>
+          {mode === "magnet" ? (
+            <div className="modal-body">
+              <label className="fld-lbl">Dán magnet link</label>
+              <textarea className="magnet-in mono" placeholder="magnet:?xt=urn:btih:..." value={magnet} onChange={(e) => setMagnet(e.target.value)} autoFocus />
+              <div className="hint">Hỗ trợ BitTorrent v1 & v2 · DHT · PeX</div>
+            </div>
+          ) : (
+            <div className="modal-body">
+              <label
+                className={"dropzone" + (drag ? " over" : "") + (fileName ? " has" : "")}
+                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) setFileName(f.name); }}
+              >
+                <input type="file" accept=".torrent" hidden onChange={(e) => e.target.files[0] && setFileName(e.target.files[0].name)} />
+                <Icon name={fileName ? "check" : "upload"} size={26} />
+                <div className="dz-main">{fileName || "Kéo thả tệp .torrent vào đây"}</div>
+                <div className="dz-sub">{fileName ? "Sẵn sàng thêm" : "hoặc bấm để chọn tệp"}</div>
+              </label>
+            </div>
+          )}
+          <div className="modal-opts">
+            <label className="opt"><input type="checkbox" defaultChecked /> Bắt đầu tải ngay</label>
+            <label className="opt"><input type="checkbox" /> Bỏ qua kiểm tra hash</label>
+          </div>
+          <footer className="modal-foot">
+            <button className="btn ghost" onClick={onClose}>Hủy</button>
+            <button className="btn primary" disabled={!valid} onClick={() => { onAdd({ mode, magnet, fileName }); onClose(); }}>
+              <Icon name="plus" size={15} /> Thêm torrent
+            </button>
+          </footer>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Toolbar ──────────────────────────────────────────────────────
+  function Toolbar({ query, onQuery, onAdd, onPauseAll, onResumeAll }) {
+    return (
+      <div className="toolbar">
+        <button className="btn primary" onClick={onAdd}><Icon name="plus" size={16} /> Thêm torrent</button>
+        <div className="tb-group">
+          <button className="btn ghost" onClick={onResumeAll} title="Tiếp tục tất cả"><Icon name="play" size={15} /> Tất cả</button>
+          <button className="btn ghost" onClick={onPauseAll} title="Tạm dừng tất cả"><Icon name="pause" size={15} /> Tất cả</button>
+        </div>
+        <div className="search">
+          <Icon name="search" size={16} />
+          <input placeholder="Tìm torrent..." value={query} onChange={(e) => onQuery(e.target.value)} />
+          {query && <button className="ibtn sm" onClick={() => onQuery("")}><Icon name="close" size={13} /></button>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Status bar ───────────────────────────────────────────────────
+  function StatusBar({ totalDown, totalUp, active, connections, dht }) {
+    return (
+      <footer className="statusbar">
+        <span className="sb-item"><span className="sb-dot live" /> {active} đang hoạt động</span>
+        <span className="sb-item dl"><Icon name="download" size={14} /> <b className="mono">{fmtSpeed(totalDown)}</b></span>
+        <span className="sb-item ul"><Icon name="upload" size={14} /> <b className="mono">{fmtSpeed(totalUp)}</b></span>
+        <span className="sb-spacer" />
+        <span className="sb-item"><Icon name="peers" size={14} /> <span className="mono">{connections}</span> kết nối</span>
+        <span className="sb-item"><Icon name="globe" size={14} /> DHT: <span className="mono">{dht}</span> nodes</span>
+        <span className="sb-item"><Icon name="bolt" size={14} /> Giới hạn: <span className="mono">∞</span></span>
+      </footer>
+    );
+  }
+
+  Object.assign(window, { DetailPanel, AddModal, StatusBar, Toolbar });
+})();
