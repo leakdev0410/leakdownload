@@ -30,7 +30,6 @@ type App struct {
 	downKB      int64
 	upKB        int64
 	cfgPath     string
-	catchServer *http.Server
 }
 
 // Settings là cấu hình gửi/nhận với frontend.
@@ -115,15 +114,11 @@ func (a *App) startup(ctx context.Context) {
 
 	go a.pushLoop()
 	go a.clipboardWatcher()
-	go a.startCatchServer()
 }
 
 // shutdown đóng engine và lưu phiên khi tắt app.
 func (a *App) shutdown(ctx context.Context) {
 	a.saveConfig()
-	if a.catchServer != nil {
-		a.catchServer.Close()
-	}
 	if a.mgr != nil {
 		a.mgr.Close()
 	}
@@ -166,55 +161,6 @@ func (a *App) clipboardWatcher() {
 }
 
 // ---- cấu hình / lưu phiên ----
-
-// startCatchServer chạy HTTP server local nhận link tải từ Chrome extension.
-func (a *App) startCatchServer() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(204)
-			return
-		}
-		w.WriteHeader(200)
-		w.Write([]byte("ok"))
-	})
-	mux.HandleFunc("/catch", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(204)
-			return
-		}
-		if r.Method != http.MethodPost {
-			http.Error(w, "POST only", 405)
-			return
-		}
-		body, _ := io.ReadAll(r.Body)
-		var req struct {
-			URL      string `json:"url"`
-			FileName string `json:"filename"`
-		}
-		json.Unmarshal(body, &req)
-		if req.URL != "" && strings.HasPrefix(req.URL, "http") {
-			if strings.HasSuffix(strings.ToLower(strings.Split(req.URL, "?")[0]), ".torrent") && a.mgr != nil {
-				a.AddTorrentURL(req.URL)
-			}
-		}
-		w.WriteHeader(200)
-		w.Write([]byte("ok"))
-	})
-
-	wruntime.LogInfo(a.ctx, "Catch server started on 127.0.0.1:19876")
-	server := &http.Server{Addr: "127.0.0.1:19876", Handler: mux}
-	a.catchServer = server
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		wruntime.LogError(a.ctx, "Catch server: "+err.Error())
-	}
-}
 
 func (a *App) loadConfig() persisted {
 	var cfg persisted
