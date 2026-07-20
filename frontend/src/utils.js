@@ -17,10 +17,11 @@ function fmtSpeed(bps) {
 function fmtEta(sec) {
   if (sec == null || sec === Infinity) return "∞";
   if (sec <= 0) return "—";
-  if (sec < 60) return Math.round(sec) + "s";
-  if (sec < 3600) return Math.floor(sec / 60) + "m " + Math.round(sec % 60) + "s";
-  if (sec < 86400) return Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
-  return Math.floor(sec / 86400) + "d " + Math.floor((sec % 86400) / 3600) + "h";
+  const s = Math.round(sec);
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
+  if (s < 86400) return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";
+  return Math.floor(s / 86400) + "d " + Math.floor((s % 86400) / 3600) + "h";
 }
 
 export { fmtBytes, fmtSpeed, fmtEta };

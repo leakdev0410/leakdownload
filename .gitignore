@@ -1,0 +1,67 @@
+# Dependencies
+frontend/node_modules/
+frontend/package-lock.json.md5
+
+# Frontend build
+frontend/dist/
+frontend/dist-ssr/
+
+# Wails / Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+torrnet
+leakdownload
+
+# Build outputs
+build/bin/
+build/installer/
+build/windows/*.syso
+*.syso
+
+# Local tooling (Inno Setup etc.)
+tools/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs & temp
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+.cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Coverage / debug
+coverage.out
+coverage.html
+debug
+__debug_bin*
+
+# Keep frontend/src/wailsjs tracked (app bindings)
+
+# Optional local dumps
+*.zip
+*.7z
+*.rar
+
+# Legacy / local-only (not needed in repo)
+frontend_old/
+torrnet-standalone.html
+.hyperfrag/

@@ -10,7 +10,10 @@
     "name": "Quân"
   },
   "info": {
+    "companyName": "leakdownload",
     "productName": "leakdownload",
-    "comments": "Trình tải file đa năng (torrent + HTTP) viết bằng Go + Wails"
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © leakdownload",
+    "comments": "Torrent desktop client built with Go + Wails"
   }
 }

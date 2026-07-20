@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import { useMemo } from 'react';
 
 let _chartId = 0;
 

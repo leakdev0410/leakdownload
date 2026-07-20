@@ -4,6 +4,10 @@ export namespace main {
 	    downloadDir: string;
 	    downKBps: number;
 	    upKBps: number;
+	    enableApibay: boolean;
+	    enableTorrentsCSV: boolean;
+	    jackettURL: string;
+	    jackettAPIKey: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -14,6 +18,10 @@ export namespace main {
 	        this.downloadDir = source["downloadDir"];
 	        this.downKBps = source["downKBps"];
 	        this.upKBps = source["upKBps"];
+	        this.enableApibay = source["enableApibay"];
+	        this.enableTorrentsCSV = source["enableTorrentsCSV"];
+	        this.jackettURL = source["jackettURL"];
+	        this.jackettAPIKey = source["jackettAPIKey"];
 	    }
 	}
 
@@ -220,6 +228,73 @@ export namespace torrentengine {
 		}
 	}
 	
+
+}
+
+export namespace torrentsearch {
+	
+	export class Result {
+	    name: string;
+	    infoHash: string;
+	    magnet: string;
+	    size: number;
+	    seeders: number;
+	    leechers: number;
+	    source: string;
+	    category?: string;
+	    link?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.infoHash = source["infoHash"];
+	        this.magnet = source["magnet"];
+	        this.size = source["size"];
+	        this.seeders = source["seeders"];
+	        this.leechers = source["leechers"];
+	        this.source = source["source"];
+	        this.category = source["category"];
+	        this.link = source["link"];
+	    }
+	}
+	export class Response {
+	    results: Result[];
+	    errors: string[];
+	    queried: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Response(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = this.convertValues(source["results"], Result);
+	        this.errors = source["errors"];
+	        this.queried = source["queried"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 

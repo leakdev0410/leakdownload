@@ -2,14 +2,16 @@ package torrentengine
 
 import (
 	"bytes"
-	"reflect"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/anacrolix/dht/v2"
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anacrolix/torrent/storage"
 	"github.com/anacrolix/torrent/types"
 	"golang.org/x/time/rate"
 )
@@ -99,14 +101,17 @@ type Detail struct {
 }
 
 type tracked struct {
-	t         *torrent.Torrent
-	paused    bool
-	magnet    string // nguồn magnet (nếu thêm bằng magnet)
-	meta      []byte // nguồn .torrent (nếu thêm bằng file)
-	lastDone  int64
-	lastUp    int64
-	downSpeed int64
-	upSpeed   int64
+	t              *torrent.Torrent
+	paused         bool
+	magnet         string // nguồn magnet (nếu thêm bằng magnet)
+	meta           []byte // nguồn .torrent (nếu thêm bằng file)
+	dataDir        string // thư mục lưu file
+	filePriorities map[int]string
+	lastDone       int64
+	lastUp         int64
+	downSpeed      int64
+	upSpeed        int64
+	startedOnce    bool
 }
 
 // Manager bọc một torrent.Client và quản lý nhiều torrent song song.
@@ -156,14 +161,21 @@ func (m *Manager) config(dataDir string) *torrent.ClientConfig {
 	cfg.Seed = true
 	cfg.DownloadRateLimiter = m.downLim
 	cfg.UploadRateLimiter = m.upLim
-	
-	// Tối ưu hóa để tải nhanh nhất có thể:
-	cfg.EstablishedConnsPerTorrent = 200 // Tăng số lượng kết nối tối đa mỗi torrent (mặc định 50)
-	cfg.HalfOpenConnsPerTorrent = 100    // Tăng số lượng kết nối đang mở (mặc định 25)
-	cfg.TorrentPeersHighWater = 1000     // Giữ trong bộ nhớ nhiều peer hơn để kết nối nhanh
-	cfg.TorrentPeersLowWater = 200       // Ngưỡng tối thiểu peer
-	cfg.DisableAcceptRateLimiting = true // Tắt giới hạn kết nối đến (chấp nhận kết nối vào nhanh hơn)
-	
+
+	// 0 = OS chọn cổng trống. Cổng mặc định 42069 dễ "bind: address already in use"
+	// khi còn instance leakdownload/client torrent khác đang chạy.
+	cfg.ListenPort = 0
+	// Không chặn startup nếu UPnP/NAT-PMP fail.
+	cfg.NoDefaultPortForwarding = true
+
+	// Tối ưu kết nối:
+	cfg.EstablishedConnsPerTorrent = 200
+	cfg.HalfOpenConnsPerTorrent = 100
+	cfg.TorrentPeersHighWater = 1000
+	cfg.TorrentPeersLowWater = 200
+	cfg.DisableAcceptRateLimiting = true
+	cfg.TotalHalfOpenConns = 500
+
 	return cfg
 }
 
@@ -195,58 +207,114 @@ func (m *Manager) DataDir() string {
 	return m.dataDir
 }
 
-// AddMagnet thêm torrent từ magnet URI.
-func (m *Manager) AddMagnet(uri string) error { return m.addMagnet(uri, false) }
+// SetDataDir đổi thư mục mặc định cho các torrent thêm mới về sau.
+func (m *Manager) SetDataDir(dir string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dataDir = dir
+}
 
-func (m *Manager) addMagnet(uri string, paused bool) error {
-	t, err := m.client.AddMagnet(uri)
+// AddMagnet thêm torrent từ magnet URI.
+// startNow=false → tạm dừng; skipHash=true → bỏ qua kiểm tra piece ban đầu.
+func (m *Manager) AddMagnet(uri string, startNow, skipHash bool) error {
+	return m.addMagnet(uri, !startNow, m.DataDir(), nil, skipHash)
+}
+
+func (m *Manager) addMagnet(uri string, paused bool, dataDir string, filePriorities map[int]string, skipHash bool) error {
+	spec, err := torrent.TorrentSpecFromMagnetUri(uri)
 	if err != nil {
 		return err
 	}
-	m.register(t, paused, uri, nil)
-	return nil
+	if dataDir != "" {
+		spec.Storage = storage.NewFile(dataDir)
+	}
+	if paused {
+		spec.DisallowDataDownload = true
+		spec.DisallowDataUpload = true
+	}
+	if skipHash {
+		spec.DisableInitialPieceCheck = true
+	}
+	t, _, err := m.client.AddTorrentSpec(spec)
+	if err != nil {
+		return err
+	}
+	return m.register(t, paused, uri, nil, dataDir, filePriorities)
 }
 
 // AddTorrentData thêm torrent từ nội dung file .torrent.
-func (m *Manager) AddTorrentData(data []byte) error { return m.addTorrentData(data, false) }
+func (m *Manager) AddTorrentData(data []byte, startNow, skipHash bool) error {
+	return m.addTorrentData(data, !startNow, m.DataDir(), nil, skipHash)
+}
 
-func (m *Manager) addTorrentData(data []byte, paused bool) error {
+func (m *Manager) addTorrentData(data []byte, paused bool, dataDir string, filePriorities map[int]string, skipHash bool) error {
 	mi, err := metainfo.Load(bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
-	t, err := m.client.AddTorrent(mi)
+	spec := torrent.TorrentSpecFromMetaInfo(mi)
+	if dataDir != "" {
+		spec.Storage = storage.NewFile(dataDir)
+	}
+	if paused {
+		spec.DisallowDataDownload = true
+		spec.DisallowDataUpload = true
+	}
+	if skipHash {
+		spec.DisableInitialPieceCheck = true
+	}
+	t, _, err := m.client.AddTorrentSpec(spec)
 	if err != nil {
 		return err
 	}
-	m.register(t, paused, "", data)
-	return nil
+	return m.register(t, paused, "", data, dataDir, filePriorities)
 }
 
 // register đưa torrent vào danh sách quản lý và bắt đầu tải khi có metadata.
-func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta []byte) {
+func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta []byte, dataDir string, filePriorities map[int]string) error {
 	h := t.InfoHash().HexString()
 
 	m.mu.Lock()
 	if _, exists := m.items[h]; exists {
 		m.mu.Unlock()
-		return // đã có rồi, bỏ qua trùng lặp
+		return fmt.Errorf("torrent đã tồn tại")
 	}
-	m.items[h] = &tracked{t: t, paused: paused, magnet: magnet, meta: meta}
+	m.items[h] = &tracked{t: t, paused: paused, magnet: magnet, meta: meta, dataDir: dataDir, filePriorities: filePriorities}
 	m.mu.Unlock()
 
 	if paused {
 		t.DisallowDataDownload()
+		t.DisallowDataUpload()
 	}
 
 	go func() {
 		<-t.GotInfo()
 		m.mu.Lock()
 		tr, ok := m.items[h]
+		if ok && tr.t != t {
+			m.mu.Unlock()
+			return
+		}
 		p := ok && tr.paused
 		if ok && tr.meta == nil && tr.magnet != "" {
 			if b, err := encodeMetainfo(t); err == nil {
 				tr.meta = b // lưu metainfo để khôi phục phiên / đổi thư mục
+			}
+		}
+		if ok && !p {
+			tr.startedOnce = true
+		}
+		if ok && len(tr.filePriorities) > 0 {
+			files := t.Files()
+			for idx, prio := range tr.filePriorities {
+				if idx >= 0 && idx < len(files) {
+					switch prio {
+					case "off":
+						files[idx].SetPriority(types.PiecePriorityNone)
+					case "hi":
+						files[idx].SetPriority(types.PiecePriorityHigh)
+					}
+				}
 			}
 		}
 		m.mu.Unlock()
@@ -254,6 +322,7 @@ func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta 
 			t.DownloadAll()
 		}
 	}()
+	return nil
 }
 
 func encodeMetainfo(t *torrent.Torrent) ([]byte, error) {
@@ -265,24 +334,27 @@ func encodeMetainfo(t *torrent.Torrent) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Pause tạm dừng tải dữ liệu.
+// Pause tạm dừng tải xuống và tải lên.
 func (m *Manager) Pause(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = true
 		tr.t.DisallowDataDownload()
+		tr.t.DisallowDataUpload()
 	}
 }
 
-// Resume tiếp tục tải.
+// Resume tiếp tục tải xuống và tải lên.
 func (m *Manager) Resume(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = false
 		tr.t.AllowDataDownload()
-		if tr.t.Info() != nil {
+		tr.t.AllowDataUpload()
+		if tr.t.Info() != nil && !tr.startedOnce {
+			tr.startedOnce = true
 			tr.t.DownloadAll()
 		}
 	}
@@ -295,6 +367,7 @@ func (m *Manager) PauseAll() {
 	for _, tr := range m.items {
 		tr.paused = true
 		tr.t.DisallowDataDownload()
+		tr.t.DisallowDataUpload()
 	}
 }
 
@@ -305,7 +378,9 @@ func (m *Manager) ResumeAll() {
 	for _, tr := range m.items {
 		tr.paused = false
 		tr.t.AllowDataDownload()
-		if tr.t.Info() != nil {
+		tr.t.AllowDataUpload()
+		if tr.t.Info() != nil && !tr.startedOnce {
+			tr.startedOnce = true
 			tr.t.DownloadAll()
 		}
 	}
@@ -328,11 +403,27 @@ func (m *Manager) Remove(hash string) {
 func (m *Manager) SetFilePriority(hash string, index int, prio string) {
 	m.mu.Lock()
 	tr, ok := m.items[hash]
-	m.mu.Unlock()
-	if !ok || tr.t.Info() == nil {
+	if !ok {
+		m.mu.Unlock()
 		return
 	}
-	files := tr.t.Files()
+	if tr.filePriorities == nil {
+		tr.filePriorities = make(map[int]string)
+	}
+	switch prio {
+	case "hi", "off":
+		tr.filePriorities[index] = prio
+	default:
+		prio = "normal"
+		delete(tr.filePriorities, index)
+	}
+	t := tr.t
+	m.mu.Unlock()
+
+	if t.Info() == nil {
+		return
+	}
+	files := t.Files()
 	if index < 0 || index >= len(files) {
 		return
 	}
@@ -392,8 +483,16 @@ func (tr *tracked) view() TorrentView {
 
 	info := t.Info()
 	if info == nil {
-		v.Name = "Đang lấy metadata…"
-		v.Status = StatusMetadata
+		if n := t.Name(); n != "" {
+			v.Name = n
+		} else {
+			v.Name = "Đang lấy metadata…"
+		}
+		if tr.paused {
+			v.Status = StatusPaused
+		} else {
+			v.Status = StatusMetadata
+		}
 		return v
 	}
 
@@ -463,24 +562,15 @@ func (m *Manager) Snapshot() Snapshot {
 	return Snapshot{Torrents: views, Stats: stats}
 }
 
-// dhtNodes đọc số node DHT bằng reflection vì DhtServer.Stats() trả về interface{}
-// (kiểu cụ thể khác nhau giữa các phiên bản anacrolix).
+// dhtNodes lấy số lượng node từ các server DHT bằng type assertion (rất nhanh so với reflection).
 func (m *Manager) dhtNodes() int {
 	n := 0
 	for _, s := range m.client.DhtServers() {
-		v := reflect.ValueOf(s.Stats())
-		if v.Kind() == reflect.Ptr {
-			v = v.Elem()
-		}
-		if v.Kind() != reflect.Struct {
-			continue
-		}
-		for _, name := range []string{"Nodes", "GoodNodes"} {
-			f := v.FieldByName(name)
-			if f.IsValid() && f.CanInt() {
-				n += int(f.Int())
-				break
-			}
+		stats := s.Stats()
+		if st, ok := stats.(dht.ServerStats); ok {
+			n += st.GoodNodes
+		} else if stPtr, ok := stats.(*dht.ServerStats); ok {
+			n += stPtr.GoodNodes
 		}
 	}
 	return n
@@ -553,15 +643,19 @@ func (m *Manager) Detail(hash string) Detail {
 
 func cleanFilePath(p, root string) string {
 	p = strings.ReplaceAll(p, "\\", "/")
-	p = strings.TrimPrefix(p, root+"/")
+	if len(p) > len(root) && p[len(root)] == '/' && strings.EqualFold(p[:len(root)], root) {
+		return p[len(root)+1:]
+	}
 	return p
 }
 
 // Source là nguồn (magnet/meta) + trạng thái để lưu phiên / đổi thư mục.
 type Source struct {
-	Magnet string
-	Meta   []byte
-	Paused bool
+	Magnet         string
+	Meta           []byte
+	Paused         bool
+	DataDir        string
+	FilePriorities map[int]string
 }
 
 // Sources trả về nguồn của mọi torrent hiện có.
@@ -570,42 +664,34 @@ func (m *Manager) Sources() []Source {
 	defer m.mu.Unlock()
 	out := make([]Source, 0, len(m.items))
 	for _, tr := range m.items {
-		out = append(out, Source{Magnet: tr.magnet, Meta: tr.meta, Paused: tr.paused})
+		var fps map[int]string
+		if info := tr.t.Info(); info != nil {
+			fps = make(map[int]string)
+			for i, f := range tr.t.Files() {
+				switch f.Priority() {
+				case types.PiecePriorityHigh, types.PiecePriorityNow, types.PiecePriorityNext, types.PiecePriorityReadahead:
+					fps[i] = "hi"
+				case types.PiecePriorityNone:
+					fps[i] = "off"
+				}
+			}
+		} else {
+			fps = tr.filePriorities
+		}
+		out = append(out, Source{Magnet: tr.magnet, Meta: tr.meta, Paused: tr.paused, DataDir: tr.dataDir, FilePriorities: fps})
 	}
 	return out
 }
 
 // Restore thêm lại một torrent đã lưu (giữ trạng thái tạm dừng).
-func (m *Manager) Restore(s Source) {
+func (m *Manager) Restore(s Source) error {
 	if len(s.Meta) > 0 {
-		_ = m.addTorrentData(s.Meta, s.Paused)
-	} else if s.Magnet != "" {
-		_ = m.addMagnet(s.Magnet, s.Paused)
+		return m.addTorrentData(s.Meta, s.Paused, s.DataDir, s.FilePriorities, false)
 	}
-}
-
-// Reconfigure tạo lại client với thư mục lưu mới, thêm lại các torrent hiện có.
-func (m *Manager) Reconfigure(newDataDir string) error {
-	srcs := m.Sources()
-
-	m.mu.Lock()
-	old := m.client
-	c, err := torrent.NewClient(m.config(newDataDir))
-	if err != nil {
-		m.mu.Unlock()
-		return err
+	if s.Magnet != "" {
+		return m.addMagnet(s.Magnet, s.Paused, s.DataDir, s.FilePriorities, false)
 	}
-	m.client = c
-	m.dataDir = newDataDir
-	m.items = make(map[string]*tracked)
-	m.mu.Unlock()
-
-	old.Close()
-
-	for _, s := range srcs {
-		m.Restore(s)
-	}
-	return nil
+	return fmt.Errorf("không có magnet hoặc metainfo")
 }
 
 // Close đóng client và dừng mọi torrent.

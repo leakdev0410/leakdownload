@@ -1,6 +1,5 @@
-import React from 'react';
-// icons.jsx — minimal stroked icon set for torrnet. Exports Icon to window.
-  const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
+// icons.jsx — minimal stroked icon set for torrnet.
+const P = { fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
 
   const PATHS = {
     download: <><path d="M12 3v12" {...P} /><path d="M7 11l5 5 5-5" {...P} /><path d="M5 21h14" {...P} /></>,
