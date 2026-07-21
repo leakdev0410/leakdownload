@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LeakDownload — Soft Minimal UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       Soft Minimal — LeakDownload design system
+       Warm stone surfaces · coral accent · airy density · soft radius
+       ═══════════════════════════════════════════════════════════ */
+    :root {
+      --accent: #E76A2E;
+      --accent-soft: color-mix(in oklch, #E76A2E 12%, transparent);
+      --accent-mid: color-mix(in oklch, #E76A2E 22%, transparent);
+      --up: #2A9B8F;
+      --up-soft: color-mix(in oklch, #2A9B8F 14%, transparent);
+      --ok: #3D9B55;
+      --ok-soft: color-mix(in oklch, #3D9B55 14%, transparent);
+      --warn: #C9952E;
+      --warn-soft: color-mix(in oklch, #C9952E 16%, transparent);
+      --danger: #D14B42;
+      --danger-soft: color-mix(in oklch, #D14B42 12%, transparent);
+
+      --bg: oklch(0.975 0.008 75);
+      --bg-wash: oklch(0.965 0.012 70);
+      --surface: oklch(0.995 0.004 80);
+      --surface-2: oklch(0.97 0.008 75);
+      --surface-3: oklch(0.955 0.01 72);
+      --border: oklch(0.91 0.01 75);
+      --border-soft: oklch(0.94 0.008 75);
+      --text: oklch(0.28 0.02 55);
+      --text-2: oklch(0.48 0.015 55);
+      --muted: oklch(0.62 0.012 60);
+      --track: oklch(0.92 0.008 75);
+      --scrim: rgba(28, 22, 16, 0.32);
+      --shadow-sm: 0 1px 2px rgba(28, 22, 16, 0.04);
+      --shadow: 0 1px 2px rgba(28, 22, 16, 0.04), 0 8px 24px -10px rgba(28, 22, 16, 0.12);
+      --shadow-lg: 0 4px 8px rgba(28, 22, 16, 0.04), 0 24px 48px -16px rgba(28, 22, 16, 0.18);
+      --radius-sm: 8px;
+      --radius: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --sidebar-w: 248px;
+      --detail-w: 420px;
+      --font: "Plus Jakarta Sans", system-ui, "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+      --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    [data-theme="dark"] {
+      --bg: oklch(0.17 0.01 60);
+      --bg-wash: oklch(0.15 0.012 55);
+      --surface: oklch(0.21 0.01 60);
+      --surface-2: oklch(0.24 0.012 58);
+      --surface-3: oklch(0.27 0.012 55);
+      --border: oklch(0.32 0.012 55);
+      --border-soft: oklch(0.28 0.01 55);
+      --text: oklch(0.94 0.01 80);
+      --text-2: oklch(0.72 0.012 70);
+      --muted: oklch(0.58 0.012 65);
+      --track: oklch(0.30 0.01 55);
+      --scrim: rgba(0, 0, 0, 0.55);
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 10px 28px -10px rgba(0, 0, 0, 0.45);
+      --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.25), 0 28px 56px -16px rgba(0, 0, 0, 0.55);
+      --accent-soft: color-mix(in oklch, #E76A2E 18%, transparent);
+      --accent-mid: color-mix(in oklch, #E76A2E 28%, transparent);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-wash);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    input, textarea { font-family: inherit; }
+    .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    ::selection { background: var(--accent-mid); }
+
+    /* ── Prototype chrome (not part of app) ──────────────── */
+    .proto-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: 44px; display: flex; align-items: center; gap: 10px;
+      padding: 0 14px;
+      background: color-mix(in oklch, var(--surface) 92%, transparent);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      font-size: 12.5px;
+    }
+    .proto-bar .label {
+      font-weight: 700; letter-spacing: -0.02em; color: var(--text);
+      margin-right: 6px; white-space: nowrap;
+    }
+    .proto-bar .label span { color: var(--accent); }
+    .proto-seg {
+      display: flex; gap: 3px; padding: 3px;
+      background: var(--surface-2); border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      overflow-x: auto; max-width: min(720px, 58vw);
+    }
+    .proto-seg button {
+      border: none; background: transparent; color: var(--text-2);
+      padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600;
+      white-space: nowrap; transition: background .15s var(--ease), color .15s;
+    }
+    .proto-seg button:hover { color: var(--text); }
+    .proto-seg button.on {
+      background: var(--surface); color: var(--text);
+      box-shadow: var(--shadow-sm); border: 1px solid var(--border-soft);
+    }
+    .proto-spacer { flex: 1; }
+    .proto-hint { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+
+    /* ── App stage ───────────────────────────────────────── */
+    .stage {
+      position: fixed; inset: 56px 16px 16px;
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      background: var(--bg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 20px 14px 14px;
+      gap: 20px;
+      min-height: 0;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 6px; }
+    .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: linear-gradient(145deg, #F08A52, var(--accent));
+      color: #fff; flex: none;
+      box-shadow: 0 4px 12px -3px color-mix(in oklch, var(--accent) 55%, transparent);
+    }
+    .brand-mark svg { display: block; }
+    .brand-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .brand-name { font-weight: 700; font-size: 16.5px; letter-spacing: -0.03em; line-height: 1.15; }
+    .brand-name span { color: var(--accent); }
+    .brand-sub { font-size: 11px; color: var(--muted); font-weight: 500; }
+
+    .nav-section { display: flex; flex-direction: column; gap: 3px; flex: 1; min-height: 0; }
+    .nav-caption {
+      font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 0 10px 6px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 11px; width: 100%;
+      border: none; background: none; color: var(--text-2);
+      padding: 10px 11px; border-radius: 10px;
+      font-size: 13.5px; font-weight: 500; text-align: left;
+      transition: background .14s var(--ease), color .14s;
+    }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item:hover svg { color: var(--text-2); }
+    .nav-item.active {
+      background: var(--accent-soft); color: var(--accent); font-weight: 600;
+    }
+    .nav-item.active svg { color: var(--accent); }
+    .nav-item svg { color: var(--muted); flex: none; transition: color .14s; }
+    .nav-label { flex: 1; }
+    .nav-count {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      background: var(--surface-2); padding: 2px 7px; border-radius: 999px;
+      min-width: 22px; text-align: center; font-family: var(--mono);
+    }
+    .nav-item.active .nav-count {
+      background: var(--accent-mid); color: var(--accent);
+    }
+    .nav-div {
+      height: 1px; background: var(--border-soft); margin: 10px 8px;
+    }
+
+    .side-foot {
+      display: flex; flex-direction: column; gap: 10px;
+      padding-top: 12px; border-top: 1px solid var(--border-soft);
+    }
+    .side-actions { display: flex; gap: 6px; }
+    .mini-speed {
+      display: flex; justify-content: space-between; gap: 10px;
+      font-size: 12px; font-family: var(--mono);
+      padding: 10px 11px; border-radius: 10px;
+      background: var(--surface-2);
+    }
+    .mini-speed .dl, .mini-speed .ul {
+      display: inline-flex; align-items: center; gap: 5px; font-weight: 500;
+    }
+    .mini-speed .dl { color: var(--accent); }
+    .mini-speed .ul { color: var(--up); }
+
+    /* ── Main ────────────────────────────────────────────── */
+    .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+
+    .toolbar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 14px 18px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .tb-group { display: flex; gap: 6px; }
+    .search-field {
+      margin-left: auto; display: flex; align-items: center; gap: 8px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 0 12px; height: 36px; width: 260px;
+      color: var(--muted); transition: border-color .14s, box-shadow .14s;
+    }
+    .search-field:focus-within {
+      border-color: color-mix(in oklch, var(--accent) 45%, var(--border));
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .search-field input {
+      border: none; background: none; outline: none; color: var(--text);
+      font-size: 13.5px; flex: 1; min-width: 0;
+    }
+    .search-field input::placeholder { color: var(--muted); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      border-radius: 999px; font-size: 13px; font-weight: 600;
+      padding: 0 16px; height: 36px; border: 1px solid transparent;
+      transition: filter .12s, background .12s, border-color .12s, transform .12s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn.primary {
+      background: var(--accent); color: #fff;
+      box-shadow: 0 2px 10px -3px color-mix(in oklch, var(--accent) 65%, transparent);
+    }
+    .btn.primary:hover { filter: brightness(1.06); }
+    .btn.primary:disabled { opacity: .42; cursor: not-allowed; filter: none; transform: none; }
+    .btn.ghost {
+      background: var(--surface); color: var(--text-2); border-color: var(--border);
+    }
+    .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+    .btn.sm { height: 30px; padding: 0 12px; font-size: 12px; gap: 5px; }
+
+    .ibtn {
+      display: grid; place-items: center;
+      width: 34px; height: 34px; border-radius: 10px;
+      border: none; background: none; color: var(--muted);
+      transition: background .12s, color .12s;
+    }
+    .ibtn:hover { background: var(--surface-2); color: var(--text); }
+    .ibtn.sm { width: 26px; height: 26px; border-radius: 8px; }
+    .ibtn.danger:hover { background: var(--danger-soft); color: var(--danger); }
+    .ibtn.on { background: var(--accent-soft); color: var(--accent); }
+
+    /* Content */
+    .content { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+    .list-wrap { flex: 1; overflow: auto; min-width: 0; }
+
+    /* Table */
+    .ttable {
+      width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px;
+    }
+    .ttable thead th {
+      position: sticky; top: 0; z-index: 2;
+      background: color-mix(in oklch, var(--bg) 92%, transparent);
+      backdrop-filter: blur(8px);
+      text-align: left; font-weight: 600; font-size: 11px;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--muted); padding: 12px 14px;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .ttable th.sortable { cursor: pointer; user-select: none; }
+    .ttable th.sortable:hover { color: var(--text-2); }
+    .ttable tbody tr {
+      border-bottom: 1px solid var(--border-soft);
+      cursor: pointer; transition: background .1s;
+    }
+    .ttable tbody tr:hover { background: var(--surface); }
+    .ttable tbody tr.sel {
+      background: var(--accent-soft);
+    }
+    .ttable tbody tr.sel td:first-child {
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .ttable td {
+      padding: 12px 14px; vertical-align: middle; overflow: hidden;
+    }
+    .num { text-align: right; white-space: nowrap; }
+    .center { text-align: center; }
+    .dl { color: var(--accent); }
+    .ul { color: var(--up); }
+
+    .cell-name { display: flex; align-items: center; gap: 11px; min-width: 0; overflow: hidden; }
+    .cat-ico {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: var(--surface-2); color: var(--text-2);
+      display: grid; place-items: center; flex: none;
+    }
+    tr.sel .cat-ico { background: var(--accent-mid); color: var(--accent); }
+    .name-text {
+      flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; font-weight: 500; color: var(--text);
+    }
+    .cell-prog { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .pct { font-size: 11.5px; color: var(--text-2); min-width: 36px; flex: none; text-align: right; }
+
+    .bar {
+      height: 7px; border-radius: 999px; background: var(--track);
+      overflow: hidden; flex: 1; min-width: 64px;
+    }
+    .bar-lg { height: 9px; }
+    .bar-sm { height: 5px; min-width: 48px; }
+    .bar-fill {
+      height: 100%; border-radius: 999px;
+      transition: width .5s var(--ease);
+    }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; white-space: nowrap;
+      padding: 3px 9px 3px 7px; border-radius: 999px;
+      background: var(--surface-2);
+    }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+
+    .row-actions {
+      display: flex; gap: 2px; justify-content: flex-end;
+      opacity: 0; transition: opacity .12s;
+    }
+    tr:hover .row-actions, tr.sel .row-actions { opacity: 1; }
+
+    /* Detail panel */
+    .detail {
+      width: var(--detail-w); flex: none;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; flex-direction: column; overflow: auto;
+      animation: panelIn .28s var(--ease);
+    }
+    @keyframes panelIn {
+      from { transform: translateX(16px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .detail-head {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 18px 16px 14px; border-bottom: 1px solid var(--border-soft);
+    }
+    .detail-title { display: flex; gap: 12px; flex: 1; min-width: 0; }
+    .cat-ico.lg {
+      width: 40px; height: 40px; border-radius: 12px;
+      background: var(--accent-soft); color: var(--accent);
+    }
+    .detail-name {
+      font-weight: 600; font-size: 14.5px; line-height: 1.3;
+      letter-spacing: -0.02em;
+      overflow: hidden; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .detail-sub {
+      font-size: 12px; color: var(--muted); margin-top: 5px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .detail-progress { padding: 16px 16px 12px; }
+    .dp-stats {
+      display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
+      font-size: 12px; color: var(--text-2); margin-top: 10px;
+    }
+    .detail-kpis {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      padding: 0 16px 14px;
+    }
+    .kpi {
+      background: var(--surface-2); border-radius: var(--radius);
+      padding: 12px 13px; display: flex; align-items: center; gap: 10px;
+      border: 1px solid var(--border-soft);
+    }
+    .kpi-ico {
+      width: 30px; height: 30px; border-radius: 9px;
+      background: var(--surface); display: grid; place-items: center;
+      color: var(--text-2); flex: none;
+    }
+    .kpi-val { font-size: 14.5px; font-weight: 600; letter-spacing: -0.02em; }
+    .kpi-lbl { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    .detail-chart { padding: 4px 16px 14px; }
+    .chart-legend {
+      display: flex; gap: 14px; font-size: 11.5px; color: var(--text-2); margin-bottom: 8px;
+    }
+    .chart-legend i {
+      display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+      margin-right: 5px; vertical-align: middle;
+    }
+    .chart-box {
+      height: 100px; border-radius: var(--radius);
+      background: var(--surface-2); border: 1px solid var(--border-soft);
+      overflow: hidden; position: relative;
+    }
+    .chart-box svg { display: block; width: 100%; height: 100%; }
+
+    .tabs {
+      display: flex; gap: 2px; padding: 0 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface); position: sticky; top: 0; z-index: 1;
+    }
+    .tab {
+      display: flex; align-items: center; gap: 6px; border: none; background: none;
+      color: var(--text-2); font-size: 12.5px; font-weight: 500;
+      padding: 12px 11px; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      transition: color .12s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab-n {
+      font-size: 10.5px; font-family: var(--mono); font-weight: 600;
+      background: var(--surface-2); color: var(--muted);
+      padding: 1px 6px; border-radius: 999px;
+    }
+    .tab.active .tab-n { background: var(--accent-soft); color: var(--accent); }
+    .tab-body { flex: 1; min-height: 0; }
+
+    .subtable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .subtable th {
+      text-align: left; font-size: 10.5px; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--muted); font-weight: 600;
+      padding: 9px 16px; border-bottom: 1px solid var(--border-soft);
+    }
+    .subtable td {
+      padding: 8px 16px; border-bottom: 1px solid var(--border-soft);
+    }
+    .subtable tr:hover td { background: var(--surface-2); }
+    .ft-name { display: flex; align-items: center; gap: 7px; color: var(--text-2); min-width: 0; }
+    .ft-name span {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
+    }
+    .ft-name svg { color: var(--muted); flex: none; }
+    .prio {
+      font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+      border: none; font-family: inherit; cursor: pointer;
+    }
+    .prio-high { color: var(--accent); background: var(--accent-soft); }
+    .prio-normal { color: var(--text-2); background: var(--surface-2); }
+    .prio-low { color: var(--muted); background: var(--surface-2); }
+    .empty-sm {
+      padding: 36px 16px; text-align: center; color: var(--muted); font-size: 12.5px;
+    }
+    .info-grid { padding: 4px 0 16px; }
+    .info-row {
+      display: grid; grid-template-columns: 120px 1fr; gap: 12px;
+      padding: 9px 16px; border-bottom: 1px solid var(--border-soft);
+    }
+    .info-k { color: var(--muted); font-size: 12px; }
+    .info-v {
+      font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Status bar */
+    .statusbar {
+      height: 36px; border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 18px; font-size: 12px; color: var(--text-2);
+    }
+    .sb-item { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .sb-item.dl b { color: var(--accent); font-weight: 600; }
+    .sb-item.ul b { color: var(--up); font-weight: 600; }
+    .sb-item svg { color: var(--muted); }
+    .sb-spacer { flex: 1; }
+    .sb-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--ok);
+      box-shadow: 0 0 0 0 color-mix(in oklch, var(--ok) 50%, transparent);
+      animation: pulse 2.2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--ok) 50%, transparent); }
+      70% { box-shadow: 0 0 0 7px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    .sb-badge {
+      font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+      background: var(--warn-soft); color: var(--warn);
+    }
+
+    /* Empty / loading / error */
+    .state-center {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; padding: 40px; text-align: center; color: var(--muted);
+    }
+    .state-illu {
+      width: 72px; height: 72px; border-radius: 22px;
+      display: grid; place-items: center;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); box-shadow: var(--shadow-sm);
+    }
+    .state-illu.warn { color: var(--warn); background: var(--warn-soft); border-color: transparent; }
+    .state-illu.err { color: var(--danger); background: var(--danger-soft); border-color: transparent; }
+    .state-title { font-size: 15.5px; font-weight: 600; color: var(--text); letter-spacing: -0.02em; }
+    .state-desc { font-size: 13px; max-width: 320px; line-height: 1.5; margin: 0; }
+    .spin {
+      width: 28px; height: 28px;
+      border: 2.5px solid var(--track); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Search panel */
+    .search-panel {
+      display: flex; flex-direction: column; height: 100%; min-height: 0;
+      padding: 16px 18px 12px; gap: 12px;
+    }
+    .search-bar { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+    .search-wide { flex: 1; max-width: none; margin-left: 0; width: auto; }
+    .search-meta { font-size: 12px; color: var(--muted); }
+    .search-history { flex-shrink: 0; display: flex; flex-direction: column; gap: 7px; }
+    .search-history-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .search-history-label { font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .search-history-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .hist-chip {
+      border: 1px solid var(--border); border-radius: 999px;
+      background: var(--surface); color: var(--text);
+      font-size: 12px; font-weight: 500; padding: 5px 12px;
+      transition: border-color .12s, color .12s, background .12s;
+    }
+    .hist-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+    .search-table-wrap {
+      flex: 1; min-height: 0; overflow: auto;
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      background: var(--surface);
+    }
+    .src-badge {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 999px;
+      background: var(--surface-2); color: var(--text-2);
+    }
+    .src-badge.src-apibay { color: var(--accent); background: var(--accent-soft); }
+    .src-badge.src-csv { color: var(--up); background: var(--up-soft); }
+    .already-badge {
+      margin-left: 8px; font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 999px; vertical-align: middle;
+      color: var(--up); background: var(--up-soft);
+    }
+    .err-chip {
+      font-size: 11.5px; padding: 4px 10px; border-radius: 8px;
+      background: var(--warn-soft); color: var(--warn);
+    }
+    .search-errors { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    /* Modal */
+    .modal-scrim {
+      position: fixed; inset: 0; z-index: 500;
+      background: var(--scrim); backdrop-filter: blur(4px);
+      display: grid; place-items: center;
+      animation: fade .16s ease;
+    }
+    @keyframes fade { from { opacity: 0; } }
+    .modal {
+      width: 480px; max-width: calc(100vw - 32px); max-height: min(90vh, 720px);
+      background: var(--surface); border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg); border: 1px solid var(--border);
+      overflow: hidden; display: flex; flex-direction: column;
+      animation: pop .2s var(--ease);
+    }
+    .modal.wide { width: 520px; }
+    @keyframes pop {
+      from { transform: translateY(10px) scale(0.98); opacity: 0; }
+      to { transform: none; opacity: 1; }
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 18px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .modal-head h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    .seg { display: flex; gap: 6px; padding: 14px 18px 0; flex-shrink: 0; }
+    .seg button {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+      border-radius: 999px; height: 38px; font-size: 13px; font-weight: 600;
+      transition: border-color .12s, color .12s, background .12s;
+    }
+    .seg button.on {
+      border-color: color-mix(in oklch, var(--accent) 50%, var(--border));
+      color: var(--accent); background: var(--accent-soft);
+    }
+    .modal-body {
+      padding: 16px 18px; overflow: auto; flex: 1;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .fld-lbl {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--text-2); margin-bottom: 7px;
+    }
+    .fld {
+      width: 100%; height: 40px; border: 1px solid var(--border);
+      border-radius: 10px; padding: 0 12px; background: var(--surface-2);
+      color: var(--text); font-size: 13px; outline: none;
+      transition: border-color .12s, box-shadow .12s;
+    }
+    .fld:focus {
+      border-color: color-mix(in oklch, var(--accent) 45%, var(--border));
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .magnet-in {
+      width: 100%; height: 96px; resize: none; border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px; background: var(--surface-2);
+      color: var(--text); font-size: 12.5px; outline: none;
+      font-family: var(--mono); transition: border-color .12s, box-shadow .12s;
+    }
+    .magnet-in:focus {
+      border-color: color-mix(in oklch, var(--accent) 45%, var(--border));
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .hint { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+    .dropzone {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; border: 1.5px dashed var(--border); border-radius: var(--radius-lg);
+      padding: 32px 20px; color: var(--muted); cursor: pointer;
+      transition: border-color .14s, background .14s, color .14s;
+    }
+    .dropzone:hover, .dropzone.over {
+      border-color: var(--accent); background: var(--accent-soft); color: var(--accent);
+    }
+    .dropzone.has {
+      border-style: solid; border-color: var(--up); color: var(--up); background: var(--up-soft);
+    }
+    .dz-main { font-size: 14px; font-weight: 600; color: var(--text); }
+    .dropzone.has .dz-main { color: var(--up); }
+    .dz-sub { font-size: 12px; }
+    .modal-opts {
+      display: flex; gap: 18px; padding: 0 18px; flex-wrap: wrap; flex-shrink: 0;
+    }
+    .opt {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12.5px; color: var(--text-2); cursor: pointer;
+    }
+    .opt input { accent-color: var(--accent); width: 15px; height: 15px; }
+    .modal-foot {
+      display: flex; justify-content: flex-end; gap: 8px;
+      padding: 14px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .settings-section {
+      border-top: 1px solid var(--border-soft); padding-top: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .settings-checks { display: flex; flex-direction: column; gap: 8px; }
+    .fld-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .fld-path { display: flex; gap: 8px; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb {
+      background: var(--track); border-radius: 8px;
+      border: 2px solid transparent; background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; border: 2px solid transparent; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 960px) {
+      .stage { grid-template-columns: 72px 1fr; inset: 52px 8px 8px; }
+      .brand-text, .nav-label, .nav-count, .nav-caption, .mini-speed, .brand-sub { display: none; }
+      .sidebar { padding: 14px 10px; align-items: center; }
+      .nav-item { justify-content: center; padding: 11px; }
+      .detail { width: 340px; }
+      .proto-hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Prototype controls -->
+  <div class="proto-bar">
+    <div class="label">leak<span>download</span></div>
+    <div class="proto-seg" id="viewSeg" role="tablist" aria-label="Màn hình prototype">
+      <button type="button" class="on" data-view="list">Danh sách + chi tiết</button>
+      <button type="button" data-view="empty">Trống</button>
+      <button type="button" data-view="loading">Đang tải</button>
+      <button type="button" data-view="error">Lỗi</button>
+      <button type="button" data-view="search">Tìm kiếm</button>
+      <button type="button" data-view="add">Modal Thêm</button>
+      <button type="button" data-view="settings">Modal Cài đặt</button>
+    </div>
+    <div class="proto-spacer"></div>
+    <span class="proto-hint">Soft minimal · hi-fi · click hàng để chọn</span>
+    <button type="button" class="ibtn" id="themeToggle" title="Sáng / tối" aria-label="Đổi theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" id="themeIcon">
+        <path d="M20 13a9 9 0 0 1-9-9 9 9 0 1 0 9 9z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="stage" id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">leak<span>download</span></div>
+          <div class="brand-sub">Torrent client</div>
+        </div>
+      </div>
+
+      <nav class="nav-section" aria-label="Bộ lọc">
+        <div class="nav-caption">Thư viện</div>
+        <button type="button" class="nav-item active" data-filter="all">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.2" fill="currentColor" stroke="none"/></svg>
+          <span class="nav-label">Tất cả</span>
+          <span class="nav-count mono">6</span>
+        </button>
+        <button type="button" class="nav-item" data-filter="downloading">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+          <span class="nav-label">Đang tải</span>
+          <span class="nav-count mono">2</span>
+        </button>
+        <button type="button" class="nav-item" data-filter="queued">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
+          <span class="nav-label">Hàng đợi</span>
+          <span class="nav-count mono">1</span>
+        </button>
+        <button type="button" class="nav-item" data-filter="seeding">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M12 9c-4 0-6-3-6-6 4 0 6 3 6 6zM12 13c4 0 6-3 6-6-4 0-6 3-6 6z"/></svg>
+          <span class="nav-label">Seeding</span>
+          <span class="nav-count mono">1</span>
+        </button>
+        <button type="button" class="nav-item" data-filter="completed">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-11"/></svg>
+          <span class="nav-label">Hoàn tất</span>
+          <span class="nav-count mono">2</span>
+        </button>
+        <button type="button" class="nav-item" data-filter="paused">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg>
+          <span class="nav-label">Tạm dừng</span>
+          <span class="nav-count mono">1</span>
+        </button>
+        <div class="nav-div"></div>
+        <div class="nav-caption">Khám phá</div>
+        <button type="button" class="nav-item" data-filter="search" id="navSearch">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>
+          <span class="nav-label">Tìm kiếm</span>
+        </button>
+      </nav>
+
+      <div class="side-foot">
+        <div class="side-actions">
+          <button type="button" class="ibtn" id="sideTheme" title="Sáng / tối">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13a9 9 0 0 1-9-9 9 9 0 1 0 9 9z"/></svg>
+          </button>
+          <button type="button" class="ibtn" id="openSettings" title="Cài đặt" aria-label="Cài đặt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="mini-speed">
+          <span class="dl">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/></svg>
+            12.4 MB/s
+          </span>
+          <span class="ul">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M7 13l5-5 5 5"/></svg>
+            0 B/s
+          </span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main column -->
+    <div class="main">
+      <div class="toolbar" id="mainToolbar">
+        <button type="button" class="btn primary" id="openAdd">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Thêm torrent
+        </button>
+        <div class="tb-group">
+          <button type="button" class="btn ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5l11 7-11 7V5z"/></svg>
+            Tất cả
+          </button>
+          <button type="button" class="btn ghost">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg>
+            Tất cả
+          </button>
+        </div>
+        <div class="search-field">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>
+          <input type="search" placeholder="Lọc danh sách..." id="listFilter" />
+        </div>
+      </div>
+
+      <div class="content" id="content">
+        <!-- LIST VIEW -->
+        <div class="list-wrap" id="viewList">
+          <table class="ttable">
+            <colgroup>
+              <col style="width:28%" /><col style="width:9%" /><col style="width:14%" />
+              <col style="width:11%" /><col style="width:9%" /><col style="width:9%" />
+              <col style="width:6%" /><col style="width:7%" /><col style="width:5%" /><col style="width:7%" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th class="sortable">Tên</th>
+                <th class="num sortable">Kích thước</th>
+                <th class="sortable">Tiến trình</th>
+                <th class="sortable">Trạng thái</th>
+                <th class="num sortable">↓ Tải</th>
+                <th class="num sortable">↑ Lên</th>
+                <th class="num">Peers</th>
+                <th class="num">ETA</th>
+                <th class="center">Ratio</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="torrentBody">
+              <!-- filled by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <aside class="detail" id="detailPanel">
+          <header class="detail-head">
+            <div class="detail-title">
+              <span class="cat-ico lg">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 9l5 3-5 3V9z"/></svg>
+              </span>
+              <div>
+                <div class="detail-name" id="dName">Sintel.2010.1080p.BluRay.x264</div>
+                <div class="detail-sub">
+                  <span class="mono" id="dSize">1.2 GB</span>
+                  <span class="pill" id="dStatus" style="color:var(--accent)"><span class="pill-dot" style="background:var(--accent)"></span>Đang tải</span>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="ibtn" id="closeDetail" title="Đóng">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </header>
+
+          <div class="detail-progress">
+            <div class="bar bar-lg"><div class="bar-fill" id="dBar" style="width:67%;background:var(--accent)"></div></div>
+            <div class="dp-stats">
+              <span class="mono" id="dPct">67%</span>
+              <span>·</span>
+              <span class="mono" id="dDone">820 MB / 1.2 GB</span>
+              <span>·</span>
+              <span class="mono">còn 42s</span>
+            </div>
+          </div>
+
+          <div class="detail-kpis">
+            <div class="kpi">
+              <span class="kpi-ico" style="color:var(--accent)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+              </span>
+              <div>
+                <div class="kpi-val mono" style="color:var(--accent)" id="dDown">8.4 MB/s</div>
+                <div class="kpi-lbl">Tốc độ tải</div>
+              </div>
+            </div>
+            <div class="kpi">
+              <span class="kpi-ico" style="color:var(--up)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M7 13l5-5 5 5"/><path d="M5 3h14"/></svg>
+              </span>
+              <div>
+                <div class="kpi-val mono" style="color:var(--up)" id="dUp">0 B/s</div>
+                <div class="kpi-lbl">Tốc độ lên</div>
+              </div>
+            </div>
+            <div class="kpi">
+              <span class="kpi-ico">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 11a3 3 0 0 0 0-6"/><path d="M21 20c0-2.5-1.4-4-3.5-4.6"/></svg>
+              </span>
+              <div>
+                <div class="kpi-val mono" id="dPeers">48 / 12</div>
+                <div class="kpi-lbl">Peers / Seeds</div>
+              </div>
+            </div>
+            <div class="kpi">
+              <span class="kpi-ico">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M12 9c-4 0-6-3-6-6 4 0 6 3 6 6z"/></svg>
+              </span>
+              <div>
+                <div class="kpi-val mono" id="dRatio">0.00</div>
+                <div class="kpi-lbl">Tỷ lệ chia sẻ</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-chart">
+            <div class="chart-legend">
+              <span><i style="background:var(--accent)"></i> Tải xuống</span>
+              <span><i style="background:var(--up)"></i> Tải lên</span>
+            </div>
+            <div class="chart-box" aria-hidden="true">
+              <svg viewBox="0 0 400 100" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="gDown" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#E76A2E" stop-opacity="0.28"/>
+                    <stop offset="100%" stop-color="#E76A2E" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,78 C30,72 50,60 80,55 C110,50 130,62 160,48 C190,34 220,40 250,28 C280,16 310,30 340,22 C370,14 390,18 400,12 L400,100 L0,100 Z" fill="url(#gDown)"/>
+                <path d="M0,78 C30,72 50,60 80,55 C110,50 130,62 160,48 C190,34 220,40 250,28 C280,16 310,30 340,22 C370,14 390,18 400,12" fill="none" stroke="#E76A2E" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                <path d="M0,92 C40,90 80,88 120,90 C160,92 200,86 240,88 C280,90 320,84 360,86 C380,87 390,88 400,87" fill="none" stroke="#2A9B8F" stroke-width="1.5" opacity="0.7" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="tabs" id="detailTabs">
+            <button type="button" class="tab active" data-tab="files">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+              Tệp tin <span class="tab-n mono">3</span>
+            </button>
+            <button type="button" class="tab" data-tab="peers">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>
+              Peers <span class="tab-n mono">4</span>
+            </button>
+            <button type="button" class="tab" data-tab="trackers">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
+              Trackers <span class="tab-n mono">2</span>
+            </button>
+            <button type="button" class="tab" data-tab="info">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+              Thông tin
+            </button>
+          </div>
+
+          <div class="tab-body">
+            <div id="tab-files">
+              <table class="subtable">
+                <thead><tr><th>Tệp</th><th style="text-align:right">Cỡ</th><th style="width:100px">Tiến trình</th><th>Ưu tiên</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="ft-name"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><span>Sintel.mkv</span></td>
+                    <td class="mono num">1.1 GB</td>
+                    <td><div class="bar bar-sm"><div class="bar-fill" style="width:72%;background:var(--accent)"></div></div></td>
+                    <td><button type="button" class="prio prio-high">Cao</button></td>
+                  </tr>
+                  <tr>
+                    <td class="ft-name"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><span>poster.jpg</span></td>
+                    <td class="mono num">240 KB</td>
+                    <td><div class="bar bar-sm"><div class="bar-fill" style="width:100%;background:var(--up)"></div></div></td>
+                    <td><button type="button" class="prio prio-normal">Thường</button></td>
+                  </tr>
+                  <tr>
+                    <td class="ft-name"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><span>sample.mkv</span></td>
+                    <td class="mono num">48 MB</td>
+                    <td><div class="bar bar-sm"><div class="bar-fill" style="width:15%;background:var(--accent)"></div></div></td>
+                    <td><button type="button" class="prio prio-low">Tắt</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="tab-peers" class="hidden">
+              <table class="subtable">
+                <thead><tr><th>Địa chỉ IP</th><th>Client</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">185.42.11.9:51413</td><td>qBittorrent 4.6</td></tr>
+                  <tr><td class="mono">103.28.54.2:6881</td><td>Transmission 4.0</td></tr>
+                  <tr><td class="mono">91.200.12.44:49152</td><td>libtorrent 2.0</td></tr>
+                  <tr><td class="mono">45.76.8.110:16881</td><td>μTorrent 3.5</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="tab-trackers" class="hidden">
+              <table class="subtable">
+                <thead><tr><th>URL</th><th style="text-align:right">Tier</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono" style="max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">udp://tracker.openbittorrent.com:80</td><td class="mono num">0</td></tr>
+                  <tr><td class="mono" style="max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">udp://tracker.opentrackr.org:1337</td><td class="mono num">1</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="tab-info" class="hidden">
+              <div class="info-grid">
+                <div class="info-row"><div class="info-k">Tên</div><div class="info-v mono">Sintel.2010.1080p.BluRay.x264</div></div>
+                <div class="info-row"><div class="info-k">Info hash (v1)</div><div class="info-v mono">08ada5a7a6183aae1e09d831df6748d566095a10</div></div>
+                <div class="info-row"><div class="info-k">Tổng dung lượng</div><div class="info-v mono">1.2 GB</div></div>
+                <div class="info-row"><div class="info-k">Đã tải</div><div class="info-v mono">820 MB</div></div>
+                <div class="info-row"><div class="info-k">Số tệp</div><div class="info-v mono">3 tệp</div></div>
+                <div class="info-row"><div class="info-k">Piece length</div><div class="info-v mono">512 KB</div></div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- EMPTY -->
+        <div class="state-center hidden" id="viewEmpty">
+          <div class="state-illu">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 21h14"/></svg>
+          </div>
+          <div class="state-title">Chưa có torrent nào</div>
+          <p class="state-desc">Thêm magnet, file .torrent hoặc tìm online để bắt đầu tải.</p>
+          <button type="button" class="btn primary" id="emptyAdd">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Thêm torrent
+          </button>
+        </div>
+
+        <!-- LOADING -->
+        <div class="state-center hidden" id="viewLoading">
+          <div class="spin" role="status" aria-label="Đang tải"></div>
+          <div class="state-title">Đang đồng bộ phiên</div>
+          <p class="state-desc">Khôi phục danh sách torrent và trạng thái hàng đợi…</p>
+        </div>
+
+        <!-- ERROR -->
+        <div class="state-center hidden" id="viewError">
+          <div class="state-illu err">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 9v4M12 16h.01"/></svg>
+          </div>
+          <div class="state-title">Không kết nối được engine</div>
+          <p class="state-desc">Backend torrent chưa sẵn sàng hoặc đã dừng. Thử lại sau vài giây.</p>
+          <button type="button" class="btn ghost">Thử lại</button>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="search-panel hidden" id="viewSearch">
+          <form class="search-bar" id="searchForm">
+            <div class="search-field search-wide">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>
+              <input type="search" placeholder="Tìm torrent online…" value="sintel" id="searchQ" />
+            </div>
+            <button type="submit" class="btn primary">Tìm kiếm</button>
+          </form>
+          <div class="search-history">
+            <div class="search-history-head">
+              <span class="search-history-label">Gần đây</span>
+              <button type="button" class="btn ghost sm">Xóa hết</button>
+            </div>
+            <div class="search-history-chips">
+              <button type="button" class="hist-chip">sintel</button>
+              <button type="button" class="hist-chip">ubuntu 24.04</button>
+              <button type="button" class="hist-chip">big buck bunny</button>
+            </div>
+          </div>
+          <div class="search-meta">12 kết quả · APIBay, Torrents-CSV</div>
+          <div class="search-errors">
+            <span class="err-chip">Jackett: chưa cấu hình URL</span>
+          </div>
+          <div class="search-table-wrap">
+            <table class="ttable">
+              <thead>
+                <tr>
+                  <th>Tên</th>
+                  <th class="num" style="width:100px">Cỡ</th>
+                  <th class="num" style="width:72px">Seeds</th>
+                  <th class="num" style="width:72px">Leech</th>
+                  <th style="width:100px">Nguồn</th>
+                  <th style="width:96px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="cell-name"><span class="name-text">Sintel (2010) 1080p Bluray <span class="already-badge">Đã có</span></span></td>
+                  <td class="mono num">1.2 GB</td>
+                  <td class="mono num">842</td>
+                  <td class="mono num">31</td>
+                  <td><span class="src-badge src-apibay">APIBay</span></td>
+                  <td><button type="button" class="btn ghost sm" disabled>Đã thêm</button></td>
+                </tr>
+                <tr>
+                  <td class="cell-name"><span class="name-text">Sintel.2010.720p.WEB-DL</span></td>
+                  <td class="mono num">640 MB</td>
+                  <td class="mono num">210</td>
+                  <td class="mono num">12</td>
+                  <td><span class="src-badge src-csv">CSV</span></td>
+                  <td><button type="button" class="btn primary sm">Thêm</button></td>
+                </tr>
+                <tr>
+                  <td class="cell-name"><span class="name-text">Sintel Directors Commentary</span></td>
+                  <td class="mono num">320 MB</td>
+                  <td class="mono num">44</td>
+                  <td class="mono num">3</td>
+                  <td><span class="src-badge src-apibay">APIBay</span></td>
+                  <td><button type="button" class="btn primary sm">Thêm</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <footer class="statusbar" id="statusBar">
+        <span class="sb-item dl">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/></svg>
+          <b class="mono">12.4 MB/s</b>
+        </span>
+        <span class="sb-item ul">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M7 13l5-5 5 5"/></svg>
+          <b class="mono">0 B/s</b>
+        </span>
+        <span class="sb-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>
+          64 kết nối
+        </span>
+        <span class="sb-item">DHT · 312</span>
+        <span class="sb-item">Queue · 1 / ∞</span>
+        <span class="sb-badge">No-seed</span>
+        <span class="sb-spacer"></span>
+        <span class="sb-item"><span class="sb-dot"></span> Sẵn sàng</span>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Add Modal -->
+  <div class="modal-scrim hidden" id="addModal" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+    <div class="modal">
+      <header class="modal-head">
+        <h3 id="addTitle">Thêm torrent mới</h3>
+        <button type="button" class="ibtn" data-close="addModal" aria-label="Đóng">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="seg" id="addSeg">
+        <button type="button" class="on" data-mode="magnet">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 4v7a6 6 0 0 0 12 0V4"/><path d="M6 4h4v7M14 4h4v7"/></svg>
+          Magnet link
+        </button>
+        <button type="button" data-mode="file">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>
+          Tệp .torrent
+        </button>
+      </div>
+      <div class="modal-body" id="addMagnetBody">
+        <div>
+          <label class="fld-lbl" for="magnetIn">Dán magnet link</label>
+          <textarea class="magnet-in" id="magnetIn" placeholder="magnet:?xt=urn:btih:..."></textarea>
+          <div class="hint" style="margin-top:8px">Hỗ trợ BitTorrent v1 &amp; v2 · DHT · PeX</div>
+        </div>
+      </div>
+      <div class="modal-body hidden" id="addFileBody">
+        <div class="dropzone" id="dropzone">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="M7 13l5-5 5 5"/><path d="M5 3h14"/></svg>
+          <div class="dz-main">Kéo thả tệp .torrent vào đây</div>
+          <div class="dz-sub">hoặc bấm để chọn tệp</div>
+        </div>
+      </div>
+      <div class="modal-opts">
+        <label class="opt"><input type="checkbox" checked /> Bắt đầu tải ngay</label>
+        <label class="opt"><input type="checkbox" /> Bỏ qua kiểm tra hash</label>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close="addModal">Hủy</button>
+        <button type="button" class="btn primary" id="addSubmit" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Thêm torrent
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-scrim hidden" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="modal wide">
+      <header class="modal-head">
+        <h3 id="setTitle">Cài đặt</h3>
+        <button type="button" class="ibtn" data-close="settingsModal" aria-label="Đóng">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+      <div class="modal-body">
+        <div>
+          <label class="fld-lbl">Thư mục lưu</label>
+          <div class="fld-path">
+            <input class="fld mono" value="C:\Users\LeQuan\Downloads\leakdownload" readonly style="flex:1" />
+            <button type="button" class="btn ghost" style="height:40px">Chọn</button>
+            <button type="button" class="btn ghost" style="height:40px">Mở</button>
+          </div>
+        </div>
+        <div class="fld-row">
+          <div>
+            <label class="fld-lbl">Giới hạn tải xuống (KB/s)</label>
+            <input class="fld mono" type="number" value="0" min="0" />
+          </div>
+          <div>
+            <label class="fld-lbl">Giới hạn tải lên (KB/s)</label>
+            <input class="fld mono" type="number" value="0" min="0" />
+          </div>
+        </div>
+        <div class="settings-section">
+          <div class="fld-lbl" style="margin-bottom:0">Hàng đợi tải</div>
+          <div>
+            <label class="fld-lbl">Số torrent tải song song (0 = không giới hạn)</label>
+            <input class="fld mono" type="number" value="3" min="0" max="50" style="max-width:140px" />
+          </div>
+          <div class="hint">Ví dụ đặt 3: chỉ 3 torrent tải cùng lúc, còn lại ở Hàng đợi.</div>
+          <label class="opt"><input type="checkbox" checked /> Thông báo Windows khi tải xong</label>
+        </div>
+        <div class="settings-section">
+          <div class="fld-lbl" style="margin-bottom:0">Seed / chia sẻ</div>
+          <label class="opt"><input type="checkbox" checked /> Chặn seed (không chia sẻ lên mạng)</label>
+          <div class="hint">Mặc định bật — chỉ tải về, không upload.</div>
+        </div>
+        <div class="settings-section">
+          <div class="fld-lbl" style="margin-bottom:0">Nguồn tìm kiếm</div>
+          <div class="settings-checks">
+            <label class="opt"><input type="checkbox" checked /> Nguồn công khai (APIBay)</label>
+            <label class="opt"><input type="checkbox" checked /> Torrents-CSV</label>
+            <label class="opt"><input type="checkbox" /> Jackett / Prowlarr</label>
+          </div>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <button type="button" class="btn ghost" data-close="settingsModal">Hủy</button>
+        <button type="button" class="btn primary" data-close="settingsModal">Lưu</button>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    /* ── Sample data (demo only) ─────────────────────────── */
+    const STATUS = {
+      downloading: { label: "Đang tải", color: "var(--accent)", dot: "var(--accent)" },
+      seeding:     { label: "Đang seed", color: "var(--up)",     dot: "var(--up)" },
+      completed:   { label: "Hoàn tất",  color: "var(--ok)",     dot: "var(--ok)" },
+      paused:      { label: "Tạm dừng",  color: "var(--muted)",  dot: "var(--muted)" },
+      queued:      { label: "Hàng đợi",  color: "var(--muted)",  dot: "var(--warn)" },
+      metadata:    { label: "Đang lấy TT", color: "var(--warn)", dot: "var(--warn)" },
+    };
+
+    const TORRENTS = [
+      { id: "1", name: "Sintel.2010.1080p.BluRay.x264", size: "1.2 GB", progress: 0.67, status: "downloading", down: "8.4 MB/s", up: "0 B/s", peers: 48, eta: "42s", ratio: "0.00", cat: "video" },
+      { id: "2", name: "Ubuntu 24.04.1 LTS Desktop amd64", size: "5.7 GB", progress: 0.31, status: "downloading", down: "4.0 MB/s", up: "0 B/s", peers: 120, eta: "16m", ratio: "0.00", cat: "software" },
+      { id: "3", name: "Big Buck Bunny 4K", size: "2.8 GB", progress: 1, status: "seeding", down: "0 B/s", up: "0 B/s", peers: 8, eta: "—", ratio: "1.42", cat: "video" },
+      { id: "4", name: "Electronic Music Pack FLAC", size: "890 MB", progress: 1, status: "completed", down: "0 B/s", up: "0 B/s", peers: 0, eta: "—", ratio: "0.00", cat: "audio" },
+      { id: "5", name: "OpenGameArt Bundle 2024", size: "3.1 GB", progress: 0, status: "queued", down: "0 B/s", up: "0 B/s", peers: 0, eta: "—", ratio: "0.00", cat: "game" },
+      { id: "6", name: "Programming eBooks Collection", size: "1.4 GB", progress: 0.55, status: "paused", down: "0 B/s", up: "0 B/s", peers: 0, eta: "—", ratio: "0.12", cat: "docs" },
+    ];
+
+    const CAT_PATH = {
+      video: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 9l5 3-5 3V9z"/>',
+      audio: '<path d="M9 18V6l10-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>',
+      software: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/>',
+      docs: '<path d="M6 3h8l4 4v14H6z"/><path d="M9 12h6M9 16h6M9 8h2"/>',
+      game: '<rect x="2" y="7" width="20" height="10" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1" fill="currentColor" stroke="none"/>',
+      file: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>',
+    };
+
+    function icon(name, size = 15) {
+      const d = CAT_PATH[name] || CAT_PATH.file;
+      return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+    }
+
+    function barColor(status, progress) {
+      if (status === "seeding" || progress >= 1) return "var(--up)";
+      if (status === "paused" || status === "queued") return "var(--muted)";
+      return "var(--accent)";
+    }
+
+    let selectedId = "1";
+    let currentView = "list";
+
+    function renderTable() {
+      const body = document.getElementById("torrentBody");
+      body.innerHTML = TORRENTS.map((t) => {
+        const st = STATUS[t.status] || STATUS.queued;
+        const sel = t.id === selectedId ? "sel" : "";
+        const pct = Math.round(t.progress * 100);
+        const color = barColor(t.status, t.progress);
+        return `<tr class="${sel}" data-id="${t.id}">
+          <td class="cell-name">
+            <span class="cat-ico">${icon(t.cat, 15)}</span>
+            <span class="name-text" title="${t.name}">${t.name}</span>
+          </td>
+          <td class="mono num">${t.size}</td>
+          <td class="cell-prog">
+            <div class="bar"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+            <span class="mono pct">${pct}%</span>
+          </td>
+          <td><span class="pill" style="color:${st.color}"><span class="pill-dot" style="background:${st.dot}"></span>${st.label}</span></td>
+          <td class="mono num dl">${t.down}</td>
+          <td class="mono num ul">${t.up}</td>
+          <td class="mono num">${t.peers}</td>
+          <td class="mono num">${t.eta}</td>
+          <td class="mono center">${t.ratio}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="ibtn sm" title="${t.status === "paused" || t.status === "queued" ? "Tiếp tục" : "Tạm dừng"}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">${t.status === "paused" || t.status === "queued" ? '<path d="M7 5l11 7-11 7V5z"/>' : '<path d="M8 5v14M16 5v14"/>'}</svg>
+              </button>
+              <button type="button" class="ibtn sm danger" title="Xóa">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>`;
+      }).join("");
+
+      body.querySelectorAll("tr").forEach((tr) => {
+        tr.addEventListener("click", (e) => {
+          if (e.target.closest("button")) return;
+          selectedId = tr.dataset.id;
+          renderTable();
+          updateDetail();
+          document.getElementById("detailPanel").classList.remove("hidden");
+        });
+      });
+    }
+
+    function updateDetail() {
+      const t = TORRENTS.find((x) => x.id === selectedId) || TORRENTS[0];
+      if (!t) return;
+      const st = STATUS[t.status] || STATUS.queued;
+      const pct = Math.round(t.progress * 100);
+      document.getElementById("dName").textContent = t.name;
+      document.getElementById("dSize").textContent = t.size;
+      document.getElementById("dStatus").innerHTML = `<span class="pill-dot" style="background:${st.dot}"></span>${st.label}`;
+      document.getElementById("dStatus").style.color = st.color;
+      document.getElementById("dBar").style.width = pct + "%";
+      document.getElementById("dBar").style.background = barColor(t.status, t.progress);
+      document.getElementById("dPct").textContent = pct + "%";
+      document.getElementById("dDone").textContent = pct + "% of " + t.size;
+      document.getElementById("dDown").textContent = t.down;
+      document.getElementById("dUp").textContent = t.up;
+      document.getElementById("dPeers").textContent = t.peers + " / —";
+      document.getElementById("dRatio").textContent = t.ratio;
+    }
+
+    /* ── Views ───────────────────────────────────────────── */
+    const panels = {
+      list: ["viewList", "detailPanel"],
+      empty: ["viewEmpty"],
+      loading: ["viewLoading"],
+      error: ["viewError"],
+      search: ["viewSearch"],
+    };
+
+    function showShellList() {
+      ["viewList", "detailPanel", "viewEmpty", "viewLoading", "viewError", "viewSearch"].forEach((id) => {
+        document.getElementById(id).classList.add("hidden");
+      });
+      document.getElementById("viewList").classList.remove("hidden");
+      if (selectedId) document.getElementById("detailPanel").classList.remove("hidden");
+      document.getElementById("mainToolbar").classList.remove("hidden");
+    }
+
+    function setView(view) {
+      currentView = view;
+      document.querySelectorAll("#viewSeg button").forEach((b) => {
+        b.classList.toggle("on", b.dataset.view === view);
+      });
+
+      if (view === "add") {
+        showShellList();
+        openModal("addModal");
+        closeModal("settingsModal");
+        return;
+      }
+      if (view === "settings") {
+        showShellList();
+        openModal("settingsModal");
+        closeModal("addModal");
+        return;
+      }
+
+      closeModal("addModal");
+      closeModal("settingsModal");
+
+      ["viewList", "detailPanel", "viewEmpty", "viewLoading", "viewError", "viewSearch"].forEach((id) => {
+        document.getElementById(id).classList.add("hidden");
+      });
+
+      const hideToolbar = view === "search" || view === "loading" || view === "error";
+      document.getElementById("mainToolbar").classList.toggle("hidden", hideToolbar);
+
+      const show = panels[view] || panels.list;
+      show.forEach((id) => {
+        if (id === "detailPanel" && !selectedId) return;
+        document.getElementById(id).classList.remove("hidden");
+      });
+
+      document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
+      if (view === "search") {
+        document.getElementById("navSearch")?.classList.add("active");
+      } else if (view === "list") {
+        document.querySelector('.nav-item[data-filter="all"]')?.classList.add("active");
+      }
+    }
+
+    /* ── Theme ───────────────────────────────────────────── */
+    function setTheme(dark) {
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      const moon = '<path d="M20 13a9 9 0 0 1-9-9 9 9 0 1 0 9 9z"/>';
+      const sun = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4l1.4-1.4M17 7l1.4-1.4"/>';
+      const path = dark ? sun : moon;
+      document.querySelectorAll("#themeToggle svg, #sideTheme svg").forEach((svg) => {
+        svg.innerHTML = path;
+      });
+    }
+
+    function toggleTheme() {
+      const dark = document.documentElement.getAttribute("data-theme") !== "dark";
+      setTheme(dark);
+    }
+
+    /* ── Modals ──────────────────────────────────────────── */
+    function openModal(id) {
+      document.getElementById(id).classList.remove("hidden");
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add("hidden");
+    }
+
+    /* ── Wire up ─────────────────────────────────────────── */
+    document.getElementById("viewSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-view]");
+      if (!btn) return;
+      setView(btn.dataset.view);
+    });
+
+    document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+    document.getElementById("sideTheme").addEventListener("click", toggleTheme);
+
+    document.getElementById("openAdd").addEventListener("click", () => openModal("addModal"));
+    document.getElementById("emptyAdd")?.addEventListener("click", () => openModal("addModal"));
+    document.getElementById("openSettings").addEventListener("click", () => openModal("settingsModal"));
+    document.getElementById("closeDetail").addEventListener("click", () => {
+      document.getElementById("detailPanel").classList.add("hidden");
+      selectedId = null;
+      renderTable();
+    });
+
+    document.querySelectorAll("[data-close]").forEach((el) => {
+      el.addEventListener("click", () => closeModal(el.dataset.close));
+    });
+    document.querySelectorAll(".modal-scrim").forEach((scrim) => {
+      scrim.addEventListener("click", (e) => {
+        if (e.target === scrim) scrim.classList.add("hidden");
+      });
+    });
+
+    document.getElementById("addSeg").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-mode]");
+      if (!btn) return;
+      document.querySelectorAll("#addSeg button").forEach((b) => b.classList.toggle("on", b === btn));
+      const isMagnet = btn.dataset.mode === "magnet";
+      document.getElementById("addMagnetBody").classList.toggle("hidden", !isMagnet);
+      document.getElementById("addFileBody").classList.toggle("hidden", isMagnet);
+      document.getElementById("addSubmit").disabled = isMagnet
+        ? !document.getElementById("magnetIn").value.trim().toLowerCase().startsWith("magnet:")
+        : true;
+    });
+
+    document.getElementById("magnetIn").addEventListener("input", (e) => {
+      document.getElementById("addSubmit").disabled = !e.target.value.trim().toLowerCase().startsWith("magnet:");
+    });
+
+    document.getElementById("dropzone").addEventListener("click", () => {
+      document.getElementById("dropzone").classList.add("has");
+      document.getElementById("dropzone").querySelector(".dz-main").textContent = "demo.torrent";
+      document.getElementById("dropzone").querySelector(".dz-sub").textContent = "Sẵn sàng thêm";
+      document.getElementById("addSubmit").disabled = false;
+    });
+
+    document.getElementById("detailTabs").addEventListener("click", (e) => {
+      const tab = e.target.closest(".tab");
+      if (!tab) return;
+      document.querySelectorAll("#detailTabs .tab").forEach((t) => t.classList.toggle("active", t === tab));
+      ["files", "peers", "trackers", "info"].forEach((id) => {
+        document.getElementById("tab-" + id).classList.toggle("hidden", id !== tab.dataset.tab);
+      });
+    });
+
+    document.querySelectorAll(".nav-item[data-filter]").forEach((n) => {
+      n.addEventListener("click", () => {
+        const f = n.dataset.filter;
+        if (f === "search") setView("search");
+        else setView("list");
+        document.querySelectorAll(".nav-item").forEach((x) => x.classList.remove("active"));
+        n.classList.add("active");
+      });
+    });
+
+    document.getElementById("searchForm").addEventListener("submit", (e) => e.preventDefault());
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeModal("addModal");
+        closeModal("settingsModal");
+      }
+    });
+
+    // Init
+    renderTable();
+    updateDetail();
+    setTheme(false);
+  </script>
+</body>
+</html>

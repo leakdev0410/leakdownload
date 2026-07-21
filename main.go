@@ -18,7 +18,7 @@ func main() {
 		Title:                    "leakdownload",
 		Width:                    1280,
 		Height:                   820,
-		MinWidth:                 1040,
+		MinWidth:                 960,
 		MinHeight:                600,
 		EnableDefaultContextMenu: true,
 		AssetServer: &assetserver.Options{

@@ -66,17 +66,31 @@ function AnimatedSpeed({ bps }) {
 }
 
 // ── Torrent table ────────────────────────────────────────────────
+// Compact defaults — sum ~900 so list+detail fits default 1280 window after fit.
 const TORRENT_COL_DEFAULTS = {
-  name: 280,
-  size: 100,
-  progress: 140,
-  status: 110,
-  down: 96,
-  up: 96,
-  peers: 64,
-  eta: 88,
-  ratio: 64,
-  actions: 84,
+  name: 200,
+  size: 78,
+  progress: 120,
+  status: 100,
+  down: 78,
+  up: 72,
+  peers: 52,
+  eta: 64,
+  ratio: 48,
+  actions: 68,
+};
+
+const TORRENT_COL_MINS = {
+  name: 96,
+  size: 56,
+  progress: 72,
+  status: 72,
+  down: 56,
+  up: 52,
+  peers: 40,
+  eta: 44,
+  ratio: 40,
+  actions: 52,
 };
 
 function Th({ colKey, children, align, sortBy, sortKey, asc, resizable, onResize, width }) {
@@ -118,15 +132,10 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
   const [sortKey, setSortKey] = useState("name");
   const [asc, setAsc] = useState(true);
   const { widths, startResize, tableRef } = useColumnWidths(
-    "leakdownload-cols-torrents",
+    "leakdownload-cols-torrents-v3",
     TORRENT_COL_DEFAULTS,
-    56,
-    { flexKeys: ["name", "progress"] },
-  );
-
-  const totalWidth = useMemo(
-    () => Object.values(widths).reduce((s, w) => s + (Number(w) || 0), 0),
-    [widths],
+    48,
+    { flexKeys: ["name", "progress"], minWidths: TORRENT_COL_MINS },
   );
 
   const sortBy = useCallback((k) => {
@@ -148,12 +157,12 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
   return (
     <table
       ref={tableRef}
-      className={"ttable resizable-table " + density}
-      style={{ width: totalWidth, minWidth: "100%" }}
+      className={"ttable resizable-table " + (density || "")}
+      style={{ width: "100%" }}
     >
       <colgroup>
         {Object.keys(TORRENT_COL_DEFAULTS).map((k) => (
-          <col key={k} style={{ width: widths[k] + "px" }} />
+          <col key={k} style={{ width: (widths[k] || TORRENT_COL_DEFAULTS[k]) + "px" }} />
         ))}
       </colgroup>
       <thead>
@@ -248,7 +257,12 @@ function Brand({ compact }) {
   return (
     <div className="brand">
       <div className="brand-mark"><Icon name="download" size={18} /></div>
-      {!compact && <div className="brand-name">leak<span>download</span></div>}
+      {!compact && (
+        <div className="brand-text">
+          <div className="brand-name">leak<span>download</span></div>
+          <div className="brand-sub">Torrent client</div>
+        </div>
+      )}
     </div>
   );
 }

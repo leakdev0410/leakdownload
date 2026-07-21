@@ -372,7 +372,7 @@ function App() {
         <Brand />
         <NavItems active={filter} onNav={setFilter} counts={counts} vertical={true} />
         <div className="side-foot">
-          <div style={{ marginBottom: 8, display: "flex", gap: 6 }}>
+          <div className="side-actions">
             <button className="ibtn" title={dark ? "Chế độ sáng" : "Chế độ tối"} onClick={() => setDark(d => !d)}>
               <Icon name={dark ? "sun" : "moon"} size={16} />
             </button>
@@ -380,7 +380,10 @@ function App() {
               <Icon name="cog" size={16} />
             </button>
           </div>
-          <div className="mini-speed"><span className="dl"><Icon name="download" size={13} /> {fmtSpeed(totalDown)}</span><span className="ul"><Icon name="upload" size={13} /> {fmtSpeed(totalUp)}</span></div>
+          <div className="mini-speed">
+            <span className="dl"><Icon name="download" size={13} /> {fmtSpeed(totalDown)}</span>
+            <span className="ul"><Icon name="upload" size={13} /> {fmtSpeed(totalUp)}</span>
+          </div>
         </div>
       </aside>
 
@@ -396,7 +399,7 @@ function App() {
           </div>
         )}
 
-        <div className="content" style={{ position: "relative" }}>
+        <div className="content">
           {isSearch ? (
             <SearchPanel
               onAdded={() => setFilter("downloading")}
@@ -405,8 +408,22 @@ function App() {
           ) : (
             <>
               <div className="list-wrap">
-                {visible.length ? <TorrentTable torrents={visible} selectedId={selId} onSelect={handleSelect} onAction={unifiedAction} density="comfortable" progressStyle="bar" exiting={exiting} />
-                : <div className="empty"><Icon name="search" size={28} /><p>Không có mục nào. Thêm torrent hoặc mở tab Tìm kiếm.</p></div>}
+                {visible.length ? (
+                  <TorrentTable
+                    torrents={visible}
+                    selectedId={selId}
+                    onSelect={handleSelect}
+                    onAction={unifiedAction}
+                    density="comfortable"
+                    progressStyle="bar"
+                    exiting={exiting}
+                  />
+                ) : (
+                  <div className="empty">
+                    <Icon name="search" size={28} />
+                    <p>Không có mục nào. Thêm torrent hoặc mở tab Tìm kiếm.</p>
+                  </div>
+                )}
               </div>
               {selected && (
                 <DetailPanel

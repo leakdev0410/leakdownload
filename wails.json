@@ -12,7 +12,7 @@
   "info": {
     "companyName": "leakdownload",
     "productName": "leakdownload",
-    "productVersion": "1.1.4",
+    "productVersion": "1.1.5",
     "copyright": "Copyright © leakdownload",
     "comments": "Torrent desktop client built with Go + Wails"
   }

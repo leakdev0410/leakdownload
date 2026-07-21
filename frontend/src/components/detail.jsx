@@ -553,7 +553,7 @@ function StatusBar({ totalDown, totalUp, active, connections, dht, downLimit, up
       <span className="sb-item ul"><Icon name="upload" size={14} /> <b className="mono">{us}</b></span>
       <span className="sb-spacer" />
       {blockSeed && (
-        <span className="sb-item" title="Đang chặn seed — mở lại trong Cài đặt"><Icon name="seed" size={14} /> <span className="mono">No seed</span></span>
+        <span className="sb-badge" title="Đang chặn seed — mở lại trong Cài đặt">No-seed</span>
       )}
       {queueHint && (
         <span className="sb-item" title="Giới hạn tải song song (Cài đặt)"><Icon name="list" size={14} /> <span className="mono">{queueHint}</span></span>

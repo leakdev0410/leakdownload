@@ -8,19 +8,19 @@
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
 [![Wails](https://img.shields.io/badge/Wails-v2-red?style=for-the-badge)](https://wails.io/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![Version](https://img.shields.io/badge/Version-1.1.4-E76A2E?style=for-the-badge&labelColor=1a1a1a)](#-tải-về-windows)
+[![Version](https://img.shields.io/badge/Version-1.1.5-E76A2E?style=for-the-badge&labelColor=1a1a1a)](#-tải-về-windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-leakdownload-181717?style=for-the-badge&logo=github)](https://github.com/leakdev0410/leakdownload)
 
 <br/>
 
-<a href="https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link">
-  <img src="https://img.shields.io/badge/⬇%20Tải%20Setup%20Windows-1.1.4-E76A2E?style=for-the-badge&labelColor=1a1a1a" alt="Download Windows Setup" />
+<a href="https://drive.google.com/file/d/1_qpTWYhKba_mz2Vusn-qfAxe9KR7I9s-/view?usp=drive_link">
+  <img src="https://img.shields.io/badge/⬇%20Tải%20Setup%20Windows-1.1.5-E76A2E?style=for-the-badge&labelColor=1a1a1a" alt="Download Windows Setup" />
 </a>
 
-**[⬇ Tải bản cài Windows (Google Drive)](https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link)**
+**[⬇ Tải bản cài Windows (Google Drive)](https://drive.google.com/file/d/1_qpTWYhKba_mz2Vusn-qfAxe9KR7I9s-/view?usp=drive_link)**
 
-`leakdownload-setup-1.1.4.exe` · Windows 10/11 (x64) · ~7 MB
+`leakdownload-setup-1.1.5.exe` · Windows 10/11 (x64) · ~7 MB
 
 **Mã nguồn:** [github.com/leakdev0410/leakdownload](https://github.com/leakdev0410/leakdownload)
 
@@ -28,7 +28,7 @@
 
 ---
 
-## ✨ Tính năng (v1.1.4)
+## ✨ Tính năng (v1.1.5)
 
 | | |
 |:---:|:---|
@@ -42,19 +42,27 @@
 | 📁 | **Ưu tiên file** — cao / thường / tắt từng tệp trong torrent |
 | ⚡ | **Giới hạn tốc độ** — down/up (KB/s), 0 = không giới hạn |
 | 📂 | **Thư mục lưu** — chọn & mở nhanh trong Cài đặt |
-| 🎨 | **Giao diện sáng / tối** — sidebar, bảng torrent, panel chi tiết |
+| 🎨 | **Giao diện Soft Minimal** — sáng / tối, sidebar, pill UI, panel chi tiết |
+| 📐 | **Bảng full-width** — cột tự căn theo cửa sổ / panel chi tiết; kéo mép cột vẫn giữ full khung |
 | 📊 | **Chi tiết torrent** — files, peers, trackers, info, biểu đồ tốc độ realtime |
-| 📐 | **Cột kéo giãn** — autofit theo khung, lưu preference (danh sách + kết quả search) |
 | 💾 | **Khôi phục phiên** — nhớ torrent, pause, ưu tiên file khi mở lại |
 | 📡 | **Status bar** — tốc độ tổng, kết nối, DHT, queue, trạng thái no-seed |
+
+### Changelog v1.1.5
+
+- Giao diện **Soft Minimal** (typography, spacing, light/dark polish)
+- Icon **Cài đặt** dạng bánh răng chuẩn
+- Bảng torrent / search **luôn fit 100%** chiều ngang cửa sổ
+- Panel chi tiết co giãn theo khung, giảm tràn layout
+- Min window width hạ còn 960px
 
 ---
 
 ## 🖥 Tải về (Windows)
 
-1. Mở link: **[Google Drive — Setup 1.1.4](https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link)**
+1. Mở link: **[Google Drive — Setup 1.1.5](https://drive.google.com/file/d/1_qpTWYhKba_mz2Vusn-qfAxe9KR7I9s-/view?usp=drive_link)**
 2. Bấm **Tải xuống**
-3. Chạy `leakdownload-setup-1.1.4.exe`
+3. Chạy `leakdownload-setup-1.1.5.exe`
 4. Chọn shortcut Desktop / Start Menu (tuỳ chọn) → **Cài đặt**
 5. Mở app và bắt đầu tải
 
@@ -64,7 +72,7 @@
 <summary><b>Link tải trực tiếp</b></summary>
 
 ```
-https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link
+https://drive.google.com/file/d/1_qpTWYhKba_mz2Vusn-qfAxe9KR7I9s-/view?usp=drive_link
 ```
 
 </details>
@@ -140,13 +148,13 @@ wails build -platform windows/amd64
 ```powershell
 # Cần Inno Setup (hoặc tools\InnoSetup sau khi cài local)
 powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1
-# → build/installer/leakdownload-setup-1.1.4.exe
+# → build/installer/leakdownload-setup-1.1.5.exe
 ```
 
 Chỉ đóng gói exe đã build sẵn:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1 -SkipAppBuild -Version 1.1.4
+powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1 -SkipAppBuild -Version 1.1.5
 ```
 
 ---
@@ -260,9 +268,9 @@ MIT License — Copyright (c) 2026 leakdownload contributors
 
 **Open source · Free to fork · Use at your own risk**
 
-**Made with ☕ · Go + Wails + React · v1.1.4**
+**Made with ☕ · Go + Wails + React · v1.1.5**
 
-[⬇ Tải Setup Windows](https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link)
+[⬇ Tải Setup Windows](https://drive.google.com/file/d/1_qpTWYhKba_mz2Vusn-qfAxe9KR7I9s-/view?usp=drive_link)
 &nbsp;·&nbsp;
 [GitHub](https://github.com/leakdev0410/leakdownload)
 &nbsp;·&nbsp;

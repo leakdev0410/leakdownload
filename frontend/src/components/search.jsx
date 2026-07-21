@@ -5,12 +5,21 @@ import { SearchTorrents, AddMagnet } from '../wailsjs/go/main/App.js';
 import { useColumnWidths } from '../useColumnWidths.js';
 
 const SEARCH_COL_DEFAULTS = {
-  name: 360,
-  size: 100,
-  seeders: 72,
-  leechers: 72,
-  source: 110,
-  actions: 96,
+  name: 280,
+  size: 88,
+  seeders: 64,
+  leechers: 64,
+  source: 96,
+  actions: 80,
+};
+
+const SEARCH_COL_MINS = {
+  name: 120,
+  size: 56,
+  seeders: 48,
+  leechers: 48,
+  source: 64,
+  actions: 64,
 };
 
 const HISTORY_KEY = 'leakdownload-search-history';
@@ -99,18 +108,13 @@ function SearchPanel({ onAdded, knownHashes }) {
   const [asc, setAsc] = useState(false);
   const [history, setHistory] = useState(() => loadSearchHistory());
   const { widths, startResize, tableRef } = useColumnWidths(
-    'leakdownload-cols-search',
+    'leakdownload-cols-search-v3',
     SEARCH_COL_DEFAULTS,
-    56,
-    { flexKeys: ['name'] },
+    48,
+    { flexKeys: ['name'], minWidths: SEARCH_COL_MINS },
   );
 
   const known = knownHashes instanceof Set ? knownHashes : new Set();
-
-  const totalWidth = useMemo(
-    () => Object.values(widths).reduce((s, w) => s + (Number(w) || 0), 0),
-    [widths],
-  );
 
   const sorted = useMemo(() => {
     const list = [...results];
@@ -305,11 +309,11 @@ function SearchPanel({ onAdded, knownHashes }) {
           <table
             ref={tableRef}
             className="ttable comfortable search-table resizable-table"
-            style={{ width: totalWidth, minWidth: '100%' }}
+            style={{ width: '100%' }}
           >
             <colgroup>
               {Object.keys(SEARCH_COL_DEFAULTS).map((k) => (
-                <col key={k} style={{ width: widths[k] + 'px' }} />
+                <col key={k} style={{ width: (widths[k] || SEARCH_COL_DEFAULTS[k]) + 'px' }} />
               ))}
             </colgroup>
             <thead>
