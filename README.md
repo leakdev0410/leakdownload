@@ -5,47 +5,56 @@
 ### Client torrent desktop gọn nhẹ — tìm, tải, quản lý trong một app
 
 [![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#-tải-về-windows)
-[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev/)
 [![Wails](https://img.shields.io/badge/Wails-v2-red?style=for-the-badge)](https://wails.io/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Version](https://img.shields.io/badge/Version-1.1.4-E76A2E?style=for-the-badge&labelColor=1a1a1a)](#-tải-về-windows)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
-[![Open Source](https://img.shields.io/badge/Open%20Source-❤%20Fork%20welcome-E76A2E?style=for-the-badge)](#-mã-nguồn-mở--được-phép-fork)
+[![GitHub](https://img.shields.io/badge/GitHub-leakdownload-181717?style=for-the-badge&logo=github)](https://github.com/leakdev0410/leakdownload)
 
 <br/>
 
-<a href="https://drive.google.com/file/d/1sVZzKJckHc96OBV07kqvud76XFenPyYC/view?usp=drive_link">
-  <img src="https://img.shields.io/badge/⬇%20Tải%20Setup%20Windows-1.0.0-E76A2E?style=for-the-badge&labelColor=1a1a1a" alt="Download Windows Setup" />
+<a href="https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link">
+  <img src="https://img.shields.io/badge/⬇%20Tải%20Setup%20Windows-1.1.4-E76A2E?style=for-the-badge&labelColor=1a1a1a" alt="Download Windows Setup" />
 </a>
 
-**[⬇ Tải bản cài Windows (Google Drive)](https://drive.google.com/file/d/1sVZzKJckHc96OBV07kqvud76XFenPyYC/view?usp=drive_link)**
+**[⬇ Tải bản cài Windows (Google Drive)](https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link)**
 
-`leakdownload-setup-1.0.0.exe` · Windows 10/11 (x64) · ~7 MB
+`leakdownload-setup-1.1.4.exe` · Windows 10/11 (x64) · ~7 MB
+
+**Mã nguồn:** [github.com/leakdev0410/leakdownload](https://github.com/leakdev0410/leakdownload)
 
 </div>
 
 ---
 
-## ✨ Tính năng
+## ✨ Tính năng (v1.1.4)
 
 | | |
 |:---:|:---|
-| 🧲 | **Thêm torrent** — magnet link, file `.torrent`, kéo-thả |
-| 🔍 | **Tìm kiếm trong app** — APIBay, Torrents-CSV, tùy chọn Jackett/Prowlarr |
-| ⏸ | **Tạm dừng / tiếp tục** — từng torrent hoặc tất cả (download + upload) |
+| 🧲 | **Thêm torrent** — magnet, file `.torrent`, kéo-thả; tùy chọn bắt đầu ngay / bỏ kiểm tra hash |
+| 🔍 | **Tìm kiếm trong app** — APIBay, Torrents-CSV; tùy chọn Jackett / Prowlarr |
+| 🕘 | **Lịch sử tìm kiếm** — chip gần đây, tìm lại một chạm, xóa từng mục hoặc toàn bộ |
+| ⏸ | **Tạm dừng / tiếp tục** — từng torrent hoặc tất cả |
+| 📋 | **Hàng đợi tải** — giới hạn số torrent tải song song (0 = không giới hạn) |
+| 🚫 | **Chặn seed** — mặc định chỉ tải, không upload; bật seed lại trong Cài đặt |
+| 🔔 | **Thông báo khi tải xong** — toast Windows / WebView (bật/tắt trong Cài đặt) |
 | 📁 | **Ưu tiên file** — cao / thường / tắt từng tệp trong torrent |
 | ⚡ | **Giới hạn tốc độ** — down/up (KB/s), 0 = không giới hạn |
 | 📂 | **Thư mục lưu** — chọn & mở nhanh trong Cài đặt |
-| 🎨 | **Giao diện sáng/tối** — sidebar, chi tiết peers/trackers, chart tốc độ |
-| 📐 | **Cột kéo giãn** — tự chỉnh độ rộng cột, lưu preference |
+| 🎨 | **Giao diện sáng / tối** — sidebar, bảng torrent, panel chi tiết |
+| 📊 | **Chi tiết torrent** — files, peers, trackers, info, biểu đồ tốc độ realtime |
+| 📐 | **Cột kéo giãn** — autofit theo khung, lưu preference (danh sách + kết quả search) |
 | 💾 | **Khôi phục phiên** — nhớ torrent, pause, ưu tiên file khi mở lại |
+| 📡 | **Status bar** — tốc độ tổng, kết nối, DHT, queue, trạng thái no-seed |
 
 ---
 
 ## 🖥 Tải về (Windows)
 
-1. Mở link: **[Google Drive — Setup](https://drive.google.com/file/d/1sVZzKJckHc96OBV07kqvud76XFenPyYC/view?usp=drive_link)**
+1. Mở link: **[Google Drive — Setup 1.1.4](https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link)**
 2. Bấm **Tải xuống**
-3. Chạy `leakdownload-setup-1.0.0.exe`
+3. Chạy `leakdownload-setup-1.1.4.exe`
 4. Chọn shortcut Desktop / Start Menu (tuỳ chọn) → **Cài đặt**
 5. Mở app và bắt đầu tải
 
@@ -55,7 +64,7 @@
 <summary><b>Link tải trực tiếp</b></summary>
 
 ```
-https://drive.google.com/file/d/1sVZzKJckHc96OBV07kqvud76XFenPyYC/view?usp=drive_link
+https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link
 ```
 
 </details>
@@ -65,9 +74,10 @@ https://drive.google.com/file/d/1sVZzKJckHc96OBV07kqvud76XFenPyYC/view?usp=drive
 ## 🚀 Dùng nhanh
 
 1. **Thêm torrent** — nút *Thêm torrent* (magnet / file) hoặc kéo thả `.torrent`
-2. **Tìm online** — tab sidebar **Tìm kiếm** → gõ từ khóa → **Thêm**
-3. **Chi tiết** — click một dòng để xem file, peers, trackers
-4. **Cài đặt** — icon ⚙ góc sidebar: thư mục lưu, limit tốc độ, nguồn search, Jackett
+2. **Tìm online** — tab sidebar **Tìm kiếm** → gõ từ khóa → **Thêm** (double-click cũng được)
+3. **Hàng đợi / seed** — Cài đặt ⚙: số tải song song, chặn seed, thông báo khi xong
+4. **Chi tiết** — click một dòng để xem file, peers, trackers, chart tốc độ
+5. **Lọc** — sidebar: Đang tải · Hàng đợi · Seeding · Hoàn tất · Tạm dừng
 
 Thư mục tải mặc định:
 
@@ -83,16 +93,33 @@ Cấu hình app:
 
 ---
 
+## 🔌 Nguồn tìm kiếm
+
+| Nguồn | Mặc định | Ghi chú |
+|:---|:---:|:---|
+| **APIBay** | Bật | API công khai |
+| **Torrents-CSV** | Bật | Bổ sung / backup |
+| **Jackett / Prowlarr** | Tắt | Cấu hình URL + API key trong Cài đặt |
+
+---
+
 ## 🛠 Build từ source
 
 ### Yêu cầu
 
-- [Go](https://go.dev/dl/) 1.21+
+- [Go](https://go.dev/dl/) 1.25+
 - [Node.js](https://nodejs.org/) 18+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation)
 
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
+```
+
+### Clone
+
+```bash
+git clone https://github.com/leakdev0410/leakdownload.git
+cd leakdownload
 ```
 
 ### Chạy dev
@@ -113,13 +140,13 @@ wails build -platform windows/amd64
 ```powershell
 # Cần Inno Setup (hoặc tools\InnoSetup sau khi cài local)
 powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1
-# → build/installer/leakdownload-setup-1.0.0.exe
+# → build/installer/leakdownload-setup-1.1.4.exe
 ```
 
 Chỉ đóng gói exe đã build sẵn:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1 -SkipAppBuild -Version 1.0.0
+powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1 -SkipAppBuild -Version 1.1.4
 ```
 
 ---
@@ -127,12 +154,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build-setup.ps1 -SkipAppBuild -
 ## 📁 Cấu trúc project
 
 ```
-torrnet/
+leakdownload/
 ├── app.go / main.go          # Wails backend bind
 ├── internal/
-│   ├── torrentengine/        # anacrolix torrent client
+│   ├── torrentengine/        # anacrolix torrent client + queue / seed block
 │   └── torrentsearch/        # multi-provider search
-├── frontend/src/             # React UI
+├── frontend/src/             # React UI (table, search, detail, settings)
 ├── installer/                # Inno Setup script
 ├── scripts/build-setup.ps1   # build app + setup
 └── build/
@@ -140,16 +167,6 @@ torrnet/
     ├── bin/                  # (gitignore) exe
     └── installer/            # (gitignore) setup
 ```
-
----
-
-## 🔌 Nguồn tìm kiếm
-
-| Nguồn | Mặc định | Ghi chú |
-|:---|:---:|:---|
-| **APIBay** | Bật | API công khai |
-| **Torrents-CSV** | Bật | Bổ sung / backup |
-| **Jackett / Prowlarr** | Tắt | Cấu hình URL + API key trong Cài đặt |
 
 ---
 
@@ -165,7 +182,9 @@ torrnet/
 
 **leakdownload** là phần mềm **mã nguồn mở** (open source), phát hành theo giấy phép **[MIT License](./LICENSE)**.
 
-Bạn được **tự do** (tương tự tinh thần phần mềm tự do như nhiều dự án Linux/FOSS):
+Repo chính: **[github.com/leakdev0410/leakdownload](https://github.com/leakdev0410/leakdownload)**
+
+Bạn được **tự do**:
 
 | Quyền | Ý nghĩa |
 |:---|:---|
@@ -176,7 +195,7 @@ Bạn được **tự do** (tương tự tinh thần phần mềm tự do như n
 | ✅ **Chia sẻ / phân phối** | Đóng gói lại, phát hành bản fork (kể cả thương mại) |
 | ✅ **Gộp lại** | Dùng code trong project khác (giữ notice MIT) |
 
-> **Fork welcome.** Clone repo, bấm **Fork** trên GitHub/GitLab, sửa thoải mái.  
+> **Fork welcome.** Clone repo, bấm **Fork** trên GitHub, sửa thoải mái.  
 > Chỉ cần **giữ nguyên thông báo bản quyền + file `LICENSE`** khi phân phối lại (điều kiện MIT).
 
 Chi tiết pháp lý đầy đủ: xem file **[LICENSE](./LICENSE)**.
@@ -232,7 +251,7 @@ MIT License — Copyright (c) 2026 leakdownload contributors
 ```
 
 - Giấy phép đầy đủ: **[LICENSE](./LICENSE)**  
-- Tóm tắt nhân quyền: [ChooseALicense — MIT](https://choosealicense.com/licenses/mit/)  
+- Tóm tắt: [ChooseALicense — MIT](https://choosealicense.com/licenses/mit/)  
 - Badge: [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 ---
@@ -241,14 +260,14 @@ MIT License — Copyright (c) 2026 leakdownload contributors
 
 **Open source · Free to fork · Use at your own risk**
 
-**Made with ☕ · Go + Wails + React**
+**Made with ☕ · Go + Wails + React · v1.1.4**
 
-[⬇ Tải Setup Windows](https://drive.google.com/file/d/1sVZzKJckHc96OBV07kqvud76XFenPyYC/view?usp=drive_link)
+[⬇ Tải Setup Windows](https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link)
+&nbsp;·&nbsp;
+[GitHub](https://github.com/leakdev0410/leakdownload)
 &nbsp;·&nbsp;
 [LICENSE](./LICENSE)
 &nbsp;·&nbsp;
-[Issues](../../issues)
-&nbsp;·&nbsp;
-[Releases](../../releases)
+[Issues](https://github.com/leakdev0410/leakdownload/issues)
 
 </div>
