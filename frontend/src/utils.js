@@ -15,8 +15,8 @@ function fmtSpeed(bps) {
   return bps + " B/s";
 }
 function fmtEta(sec) {
-  if (sec == null || sec === Infinity) return "∞";
-  if (sec <= 0) return "—";
+  if (sec == null || sec === Infinity || sec < 0 || Number.isNaN(sec)) return "∞";
+  if (sec === 0) return "—";
   const s = Math.round(sec);
   if (s < 60) return s + "s";
   if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";

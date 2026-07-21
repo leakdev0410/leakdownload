@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Icon } from './icons.jsx';
 import { fmtBytes } from '../utils.js';
 import { SearchTorrents, AddMagnet } from '../wailsjs/go/main/App.js';
@@ -12,6 +12,35 @@ const SEARCH_COL_DEFAULTS = {
   source: 110,
   actions: 96,
 };
+
+const HISTORY_KEY = 'leakdownload-search-history';
+const MAX_SEARCH_HISTORY = 24;
+
+function loadSearchHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(x => typeof x === 'string' && x.trim()).slice(0, MAX_SEARCH_HISTORY) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSearchHistory(list) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_SEARCH_HISTORY)));
+  } catch { /* private mode */ }
+}
+
+function pushSearchHistory(query) {
+  const q = query.trim();
+  if (q.length < 2) return loadSearchHistory();
+  const prev = loadSearchHistory().filter(x => x.toLowerCase() !== q.toLowerCase());
+  const next = [q, ...prev].slice(0, MAX_SEARCH_HISTORY);
+  saveSearchHistory(next);
+  return next;
+}
 
 function SearchTh({ colKey, children, align, sortable, sortKey, asc, widths, onSort, onResize }) {
   return (
@@ -57,7 +86,7 @@ function sourceClass(src) {
   return '';
 }
 
-function SearchPanel({ onAdded }) {
+function SearchPanel({ onAdded, knownHashes }) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
@@ -68,7 +97,15 @@ function SearchPanel({ onAdded }) {
   const [added, setAdded] = useState(new Set());
   const [sortKey, setSortKey] = useState('seeders');
   const [asc, setAsc] = useState(false);
-  const { widths, startResize } = useColumnWidths('leakdownload-cols-search', SEARCH_COL_DEFAULTS);
+  const [history, setHistory] = useState(() => loadSearchHistory());
+  const { widths, startResize, tableRef } = useColumnWidths(
+    'leakdownload-cols-search',
+    SEARCH_COL_DEFAULTS,
+    56,
+    { flexKeys: ['name'] },
+  );
+
+  const known = knownHashes instanceof Set ? knownHashes : new Set();
 
   const totalWidth = useMemo(
     () => Object.values(widths).reduce((s, w) => s + (Number(w) || 0), 0),
@@ -97,16 +134,18 @@ function SearchPanel({ onAdded }) {
     }
   }
 
-  async function runSearch(e) {
+  const runSearch = useCallback(async (e, overrideQuery) => {
     e?.preventDefault?.();
-    const query = q.trim();
+    const query = (overrideQuery != null ? overrideQuery : q).trim();
     if (query.length < 2) {
       alert('Nhập ít nhất 2 ký tự để tìm.');
       return;
     }
+    if (overrideQuery != null) setQ(query);
     setLoading(true);
     setSearched(true);
     setErrors([]);
+    setHistory(pushSearchHistory(query));
     try {
       const res = await SearchTorrents(query);
       setResults(res?.results || []);
@@ -120,11 +159,23 @@ function SearchPanel({ onAdded }) {
     } finally {
       setLoading(false);
     }
+  }, [q]);
+
+  function clearHistory() {
+    saveSearchHistory([]);
+    setHistory([]);
+  }
+
+  function removeHistoryItem(term) {
+    const next = loadSearchHistory().filter(x => x !== term);
+    saveSearchHistory(next);
+    setHistory(next);
   }
 
   async function addOne(row) {
     const key = row.infoHash || row.magnet;
-    if (!row.magnet || adding.has(key) || added.has(key)) return;
+    const hash = (row.infoHash || '').toLowerCase();
+    if (!row.magnet || adding.has(key) || added.has(key) || (hash && known.has(hash))) return;
     setAdding(prev => new Set(prev).add(key));
     try {
       const err = await AddMagnet(row.magnet, true, false);
@@ -143,6 +194,13 @@ function SearchPanel({ onAdded }) {
         return n;
       });
     }
+  }
+
+  function isAlreadyInList(row) {
+    const h = (row.infoHash || '').toLowerCase();
+    if (h && known.has(h)) return true;
+    const key = row.infoHash || row.magnet;
+    return added.has(key);
   }
 
   return (
@@ -167,6 +225,38 @@ function SearchPanel({ onAdded }) {
           {loading ? 'Đang tìm…' : 'Tìm kiếm'}
         </button>
       </form>
+
+      {history.length > 0 && (
+        <div className="search-history">
+          <div className="search-history-head">
+            <span className="search-history-label">Gần đây</span>
+            <button type="button" className="btn ghost sm" onClick={clearHistory}>Xóa lịch sử</button>
+          </div>
+          <div className="search-history-chips">
+            {history.map((term) => (
+              <span key={term} className="hist-chip-wrap">
+                <button
+                  type="button"
+                  className="hist-chip"
+                  title="Tìm lại"
+                  disabled={loading}
+                  onClick={() => runSearch(null, term)}
+                >
+                  {term}
+                </button>
+                <button
+                  type="button"
+                  className="hist-chip-x"
+                  title="Xóa"
+                  onClick={() => removeHistoryItem(term)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {queried.length > 0 && (
         <div className="search-meta">
@@ -206,7 +296,11 @@ function SearchPanel({ onAdded }) {
 
       {!loading && results.length > 0 && (
         <div className="search-table-wrap">
-          <table className="ttable comfortable search-table resizable-table" style={{ width: totalWidth, minWidth: '100%' }}>
+          <table
+            ref={tableRef}
+            className="ttable comfortable search-table resizable-table"
+            style={{ width: totalWidth, minWidth: '100%' }}
+          >
             <colgroup>
               {Object.keys(SEARCH_COL_DEFAULTS).map((k) => (
                 <col key={k} style={{ width: widths[k] + 'px' }} />
@@ -226,11 +320,17 @@ function SearchPanel({ onAdded }) {
               {sorted.map((row) => {
                 const key = row.infoHash || row.magnet;
                 const isAdding = adding.has(key);
-                const isAdded = added.has(key);
+                const already = isAlreadyInList(row);
                 return (
-                  <tr key={key} onDoubleClick={() => addOne(row)} title="Double-click để thêm">
+                  <tr
+                    key={key}
+                    className={already ? 'row-already' : undefined}
+                    onDoubleClick={() => !already && addOne(row)}
+                    title={already ? 'Đã có trong danh sách' : 'Double-click để thêm'}
+                  >
                     <td className="cell-name">
                       <span className="name-text" title={row.name}>{row.name}</span>
+                      {already && <span className="already-badge">Đã thêm</span>}
                     </td>
                     <td className="mono num" title={row.size ? row.size + ' B' : undefined}>{row.size ? fmtBytes(row.size) : '—'}</td>
                     <td className="mono num" style={{ color: row.seeders > 0 ? 'var(--up)' : 'var(--muted)' }}>
@@ -242,13 +342,13 @@ function SearchPanel({ onAdded }) {
                     </td>
                     <td className="cell-act" onClick={e => e.stopPropagation()}>
                       <button
-                        className={'btn sm ' + (isAdded ? 'ghost' : 'primary')}
-                        disabled={isAdding || isAdded}
+                        className={'btn sm ' + (already ? 'ghost' : 'primary')}
+                        disabled={isAdding || already}
                         onClick={() => addOne(row)}
-                        title={isAdded ? 'Đã thêm' : 'Thêm torrent'}
+                        title={already ? 'Đã có trong danh sách' : 'Thêm torrent'}
                       >
-                        <Icon name={isAdded ? 'check' : 'plus'} size={14} />
-                        {isAdded ? 'Xong' : isAdding ? '…' : 'Thêm'}
+                        <Icon name={already ? 'check' : 'plus'} size={14} />
+                        {already ? 'Có rồi' : isAdding ? '…' : 'Thêm'}
                       </button>
                     </td>
                   </tr>

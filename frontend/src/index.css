@@ -248,6 +248,19 @@ tr:hover .row-actions,tr.sel .row-actions{opacity:1;}
 .search-empty{flex:1;}
 .search-table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
 .search-table{width:100%;}
+.search-history{flex-shrink:0;display:flex;flex-direction:column;gap:6px;}
+.search-history-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.search-history-label{font-size:12px;font-weight:600;color:var(--text-2);}
+.search-history-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.hist-chip-wrap{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:20px;background:var(--surface-2);overflow:hidden;}
+.hist-chip{border:none;background:transparent;color:var(--text);font-size:12px;font-weight:500;padding:4px 8px 4px 12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hist-chip:hover{color:var(--accent);}
+.hist-chip:disabled{opacity:.55;cursor:default;}
+.hist-chip-x{border:none;background:transparent;color:var(--muted);font-size:14px;line-height:1;padding:4px 8px 4px 2px;}
+.hist-chip-x:hover{color:var(--accent);}
+.already-badge{margin-left:8px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;vertical-align:middle;
+  color:var(--up);background:color-mix(in oklch,var(--up) 14%,transparent);white-space:nowrap;}
+.row-already td{opacity:.78;}
 .src-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--surface-2);color:var(--text-2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;}
 .src-badge.src-apibay{color:var(--accent);background:color-mix(in oklch,var(--accent) 12%,transparent);}
 .src-badge.src-csv{color:var(--up);background:color-mix(in oklch,var(--up) 12%,transparent);}

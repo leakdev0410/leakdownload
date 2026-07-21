@@ -8,6 +8,9 @@ export namespace main {
 	    enableTorrentsCSV: boolean;
 	    jackettURL: string;
 	    jackettAPIKey: string;
+	    maxActiveDownloads: number;
+	    notifyOnComplete: boolean;
+	    blockSeed: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -22,6 +25,9 @@ export namespace main {
 	        this.enableTorrentsCSV = source["enableTorrentsCSV"];
 	        this.jackettURL = source["jackettURL"];
 	        this.jackettAPIKey = source["jackettAPIKey"];
+	        this.maxActiveDownloads = source["maxActiveDownloads"];
+	        this.notifyOnComplete = source["notifyOnComplete"];
+	        this.blockSeed = source["blockSeed"];
 	    }
 	}
 
@@ -131,10 +137,13 @@ export namespace torrentengine {
 	    seeding: number;
 	    completed: number;
 	    paused: number;
+	    queued: number;
 	    connections: number;
 	    dhtNodes: number;
 	    downLimit: number;
 	    upLimit: number;
+	    maxActive: number;
+	    blockSeed: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new GlobalStats(source);
@@ -150,10 +159,13 @@ export namespace torrentengine {
 	        this.seeding = source["seeding"];
 	        this.completed = source["completed"];
 	        this.paused = source["paused"];
+	        this.queued = source["queued"];
 	        this.connections = source["connections"];
 	        this.dhtNodes = source["dhtNodes"];
 	        this.downLimit = source["downLimit"];
 	        this.upLimit = source["upLimit"];
+	        this.maxActive = source["maxActive"];
+	        this.blockSeed = source["blockSeed"];
 	    }
 	}
 	

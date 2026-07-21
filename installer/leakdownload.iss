@@ -3,7 +3,7 @@
 ; Manual: tools\InnoSetup\ISCC.exe /DMyAppVersion=1.0.0 installer\leakdownload.iss
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0"
+  #define MyAppVersion "1.1.3"
 #endif
 
 #define MyAppName "leakdownload"

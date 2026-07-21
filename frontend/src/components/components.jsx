@@ -102,11 +102,14 @@ function Th({ colKey, children, align, sortBy, sortKey, asc, resizable, onResize
 
 function compareTorrents(a, b, sortKey) {
   switch (sortKey) {
-    case "name": return a.name.localeCompare(b.name);
-    case "size": return a.size - b.size;
-    case "progress": return a.progress - b.progress;
-    case "down": return a.down - b.down;
-    case "up": return a.up - b.up;
+    case "name": return (a.name || "").localeCompare(b.name || "");
+    case "size": return (a.size || 0) - (b.size || 0);
+    case "progress": return (a.progress || 0) - (b.progress || 0);
+    case "down": return (a.down || 0) - (b.down || 0);
+    case "up": return (a.up || 0) - (b.up || 0);
+    case "peers": return (a.peers || 0) - (b.peers || 0);
+    case "ratio": return (a.ratio || 0) - (b.ratio || 0);
+    case "status": return (a.status || "").localeCompare(b.status || "");
     default: return 0;
   }
 }
@@ -114,7 +117,12 @@ function compareTorrents(a, b, sortKey) {
 function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progressStyle, exiting }) {
   const [sortKey, setSortKey] = useState("name");
   const [asc, setAsc] = useState(true);
-  const { widths, startResize } = useColumnWidths("leakdownload-cols-torrents", TORRENT_COL_DEFAULTS);
+  const { widths, startResize, tableRef } = useColumnWidths(
+    "leakdownload-cols-torrents",
+    TORRENT_COL_DEFAULTS,
+    56,
+    { flexKeys: ["name", "progress"] },
+  );
 
   const totalWidth = useMemo(
     () => Object.values(widths).reduce((s, w) => s + (Number(w) || 0), 0),
@@ -133,7 +141,11 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
   const col = (k) => ({ width: widths[k] });
 
   return (
-    <table className={"ttable resizable-table " + density} style={{ width: totalWidth, minWidth: "100%" }}>
+    <table
+      ref={tableRef}
+      className={"ttable resizable-table " + density}
+      style={{ width: totalWidth, minWidth: "100%" }}
+    >
       <colgroup>
         {Object.keys(TORRENT_COL_DEFAULTS).map((k) => (
           <col key={k} style={{ width: widths[k] + "px" }} />
@@ -144,12 +156,12 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
           <Th colKey="name" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("name")}>Tên</Th>
           <Th colKey="size" align="right" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("size")}>Kích thước</Th>
           <Th colKey="progress" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("progress")}>Tiến trình</Th>
-          <Th colKey="status" resizable onResize={startResize} {...col("status")}>Trạng thái</Th>
+          <Th colKey="status" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("status")}>Trạng thái</Th>
           <Th colKey="down" align="right" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("down")}>↓ Tải</Th>
           <Th colKey="up" align="right" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("up")}>↑ Lên</Th>
-          <Th colKey="peers" align="right" resizable onResize={startResize} {...col("peers")}>Peers</Th>
+          <Th colKey="peers" align="right" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("peers")}>Peers</Th>
           <Th colKey="eta" align="right" resizable onResize={startResize} {...col("eta")}>ETA</Th>
-          <Th colKey="ratio" align="center" resizable onResize={startResize} {...col("ratio")}>Ratio</Th>
+          <Th colKey="ratio" align="center" sortBy={sortBy} sortKey={sortKey} asc={asc} resizable onResize={startResize} {...col("ratio")}>Ratio</Th>
           <Th colKey="actions" {...col("actions")}></Th>
         </tr>
       </thead>
@@ -197,10 +209,17 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
 
 function RowActions({ t, onAction }) {
   const isPaused = t.status === "paused";
+  const isQueued = t.status === "queued";
+  // Paused hoặc queued: nút play (tiếp tục / ưu tiên lên đầu queue).
+  const showPlay = isPaused || isQueued;
   return (
     <div className="row-actions">
-      <button className="ibtn" title={isPaused ? "Tiếp tục" : "Tạm dừng"} onClick={() => onAction(t, isPaused ? "resume" : "pause")}>
-        <Icon name={isPaused ? "play" : "pause"} size={15} />
+      <button
+        className="ibtn"
+        title={isQueued ? "Ưu tiên tải ngay" : isPaused ? "Tiếp tục" : "Tạm dừng"}
+        onClick={() => onAction(t, showPlay ? "resume" : "pause")}
+      >
+        <Icon name={showPlay ? "play" : "pause"} size={15} />
       </button>
       <button className="ibtn danger" title="Xóa" onClick={() => onAction(t, "remove")}>
         <Icon name="trash" size={15} />
@@ -214,6 +233,7 @@ const NAV = [
   { id: "search", label: "Tìm kiếm", icon: "search" },
   { id: "all", label: "Tất cả", icon: "list" },
   { id: "downloading", label: "Đang tải", icon: "download" },
+  { id: "queued", label: "Hàng đợi", icon: "list" },
   { id: "seeding", label: "Đang seed", icon: "upload" },
   { id: "completed", label: "Hoàn tất", icon: "check" },
   { id: "paused", label: "Tạm dừng", icon: "pause" },

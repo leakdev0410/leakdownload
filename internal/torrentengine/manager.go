@@ -24,7 +24,8 @@ const (
 	StatusDownloading Status = "downloading" // đang tải
 	StatusSeeding     Status = "seeding"     // đã xong, đang seed (có peer/đang lên)
 	StatusCompleted   Status = "completed"   // đã xong, không hoạt động
-	StatusPaused      Status = "paused"      // tạm dừng
+	StatusPaused      Status = "paused"      // tạm dừng (user)
+	StatusQueued      Status = "queued"      // chờ slot tải (queue)
 )
 
 // TorrentView là dữ liệu phẳng (JSON) cho danh sách torrent ở frontend.
@@ -55,10 +56,13 @@ type GlobalStats struct {
 	Seeding     int   `json:"seeding"`
 	Completed   int   `json:"completed"`
 	Paused      int   `json:"paused"`
+	Queued      int   `json:"queued"`
 	Connections int   `json:"connections"`
 	DhtNodes    int   `json:"dhtNodes"`
 	DownLimit   int64 `json:"downLimit"` // bytes/s, 0 = không giới hạn
 	UpLimit     int64 `json:"upLimit"`
+	MaxActive   int   `json:"maxActive"` // 0 = không giới hạn số torrent tải song song
+	BlockSeed   bool  `json:"blockSeed"` // true = đang chặn seed/upload
 }
 
 // Snapshot gói cả danh sách torrent và số liệu tổng cho một lần cập nhật.
@@ -102,26 +106,31 @@ type Detail struct {
 
 type tracked struct {
 	t              *torrent.Torrent
-	paused         bool
-	magnet         string // nguồn magnet (nếu thêm bằng magnet)
-	meta           []byte // nguồn .torrent (nếu thêm bằng file)
-	dataDir        string // thư mục lưu file
+	paused         bool // user tạm dừng
+	queued         bool // chờ slot (do maxActive)
+	magnet         string
+	meta           []byte
+	dataDir        string
 	filePriorities map[int]string
 	lastDone       int64
 	lastUp         int64
 	downSpeed      int64
 	upSpeed        int64
 	startedOnce    bool
+	addedAt        time.Time // FIFO queue
 }
 
 // Manager bọc một torrent.Client và quản lý nhiều torrent song song.
 type Manager struct {
-	mu      sync.Mutex
-	client  *torrent.Client
-	items   map[string]*tracked
-	dataDir string
-	downLim *rate.Limiter
-	upLim   *rate.Limiter
+	mu        sync.Mutex
+	client    *torrent.Client
+	items     map[string]*tracked
+	dataDir   string
+	downLim   *rate.Limiter
+	upLim     *rate.Limiter
+	maxActive int   // 0 = không giới hạn số torrent đang tải
+	boostSeq  int64 // tăng dần khi user ưu tiên torrent trong queue
+	blockSeed bool  // true = không upload/seed (mặc định)
 }
 
 const limiterBurst = 1 << 18 // 256 KiB
@@ -142,10 +151,11 @@ func New(dataDir string, downBytesPerSec, upBytesPerSec int64) (*Manager, error)
 	dl, db := makeLimit(downBytesPerSec)
 	ul, ub := makeLimit(upBytesPerSec)
 	m := &Manager{
-		items:   make(map[string]*tracked),
-		dataDir: dataDir,
-		downLim: rate.NewLimiter(dl, db),
-		upLim:   rate.NewLimiter(ul, ub),
+		items:     make(map[string]*tracked),
+		dataDir:   dataDir,
+		downLim:   rate.NewLimiter(dl, db),
+		upLim:     rate.NewLimiter(ul, ub),
+		blockSeed: true, // mặc định chặn seed
 	}
 	c, err := torrent.NewClient(m.config(dataDir))
 	if err != nil {
@@ -158,7 +168,8 @@ func New(dataDir string, downBytesPerSec, upBytesPerSec int64) (*Manager, error)
 func (m *Manager) config(dataDir string) *torrent.ClientConfig {
 	cfg := torrent.NewDefaultClientConfig()
 	cfg.DataDir = dataDir
-	cfg.Seed = true
+	// Seed client-level: tắt khi đang chặn seed.
+	cfg.Seed = !m.blockSeed
 	cfg.DownloadRateLimiter = m.downLim
 	cfg.UploadRateLimiter = m.upLim
 
@@ -187,6 +198,114 @@ func (m *Manager) SetSpeedLimit(downBytesPerSec, upBytesPerSec int64) {
 	m.downLim.SetBurst(db)
 	m.upLim.SetLimit(ul)
 	m.upLim.SetBurst(ub)
+}
+
+// SetMaxActive đặt số torrent được tải song song (0 = không giới hạn) và sắp xếp lại queue.
+func (m *Manager) SetMaxActive(n int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if n < 0 {
+		n = 0
+	}
+	m.maxActive = n
+	m.reconcileQueueLocked()
+}
+
+// MaxActive trả về giới hạn tải song song (0 = không giới hạn).
+func (m *Manager) MaxActive() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.maxActive
+}
+
+// SetBlockSeed bật/tắt chặn upload (seed). true = không chia sẻ lên.
+func (m *Manager) SetBlockSeed(block bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.blockSeed = block
+	for _, tr := range m.items {
+		if tr.paused {
+			continue
+		}
+		m.applyUploadPolicyLocked(tr)
+	}
+}
+
+// BlockSeed trả về true nếu đang chặn seed.
+func (m *Manager) BlockSeed() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.blockSeed
+}
+
+// applyUploadPolicyLocked áp dụng chặn/cho phép upload theo blockSeed. Caller giữ m.mu.
+func (m *Manager) applyUploadPolicyLocked(tr *tracked) {
+	if tr.paused || m.blockSeed {
+		tr.t.DisallowDataUpload()
+		return
+	}
+	tr.t.AllowDataUpload()
+}
+
+// isComplete báo torrent đã tải đủ dữ liệu (có metadata).
+func (tr *tracked) isComplete() bool {
+	info := tr.t.Info()
+	if info == nil {
+		return false
+	}
+	total := tr.t.Length()
+	return total > 0 && tr.t.BytesCompleted() >= total
+}
+
+// activateLocked cho phép tải (và DownloadAll lần đầu). Caller giữ m.mu.
+func (m *Manager) activateLocked(tr *tracked) {
+	tr.queued = false
+	tr.t.AllowDataDownload()
+	m.applyUploadPolicyLocked(tr)
+	if tr.t.Info() != nil && !tr.startedOnce {
+		tr.startedOnce = true
+		tr.t.DownloadAll()
+	}
+}
+
+// parkDownloadLocked giữ torrent trong queue: không tải thêm; upload theo policy seed.
+func (m *Manager) parkDownloadLocked(tr *tracked) {
+	tr.queued = true
+	tr.t.DisallowDataDownload()
+	m.applyUploadPolicyLocked(tr)
+}
+
+// reconcileQueueLocked gán slot tải theo FIFO. Caller phải giữ m.mu.
+func (m *Manager) reconcileQueueLocked() {
+	var waiting []*tracked
+	for _, tr := range m.items {
+		if tr.paused {
+			tr.queued = false
+			continue
+		}
+		if tr.isComplete() {
+			tr.queued = false
+			// Hoàn tất: không chiếm slot tải; seed chỉ khi không chặn.
+			m.applyUploadPolicyLocked(tr)
+			continue
+		}
+		waiting = append(waiting, tr)
+	}
+	sort.SliceStable(waiting, func(i, j int) bool {
+		return waiting[i].addedAt.Before(waiting[j].addedAt)
+	})
+
+	limit := m.maxActive
+	if limit <= 0 {
+		limit = len(waiting)
+	}
+	for i, tr := range waiting {
+		if i < limit {
+			m.activateLocked(tr)
+		} else {
+			m.parkDownloadLocked(tr)
+		}
+	}
 }
 
 // Limits trả về giới hạn hiện tại (bytes/s, 0 = vô hạn).
@@ -270,7 +389,7 @@ func (m *Manager) addTorrentData(data []byte, paused bool, dataDir string, fileP
 	return m.register(t, paused, "", data, dataDir, filePriorities)
 }
 
-// register đưa torrent vào danh sách quản lý và bắt đầu tải khi có metadata.
+// register đưa torrent vào danh sách quản lý; queue quyết định khi nào được tải.
 func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta []byte, dataDir string, filePriorities map[int]string) error {
 	h := t.InfoHash().HexString()
 
@@ -279,34 +398,41 @@ func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta 
 		m.mu.Unlock()
 		return fmt.Errorf("torrent đã tồn tại")
 	}
-	m.items[h] = &tracked{t: t, paused: paused, magnet: magnet, meta: meta, dataDir: dataDir, filePriorities: filePriorities}
-	m.mu.Unlock()
-
+	tr := &tracked{
+		t:              t,
+		paused:         paused,
+		magnet:         magnet,
+		meta:           meta,
+		dataDir:        dataDir,
+		filePriorities: filePriorities,
+		addedAt:        time.Now(),
+	}
+	m.items[h] = tr
 	if paused {
 		t.DisallowDataDownload()
 		t.DisallowDataUpload()
+	} else {
+		// Gán slot ngay (có thể vào queue nếu full).
+		m.reconcileQueueLocked()
 	}
+	m.mu.Unlock()
 
 	go func() {
 		<-t.GotInfo()
 		m.mu.Lock()
-		tr, ok := m.items[h]
-		if ok && tr.t != t {
-			m.mu.Unlock()
+		defer m.mu.Unlock()
+		cur, ok := m.items[h]
+		if !ok || cur.t != t {
 			return
 		}
-		p := ok && tr.paused
-		if ok && tr.meta == nil && tr.magnet != "" {
+		if cur.meta == nil && cur.magnet != "" {
 			if b, err := encodeMetainfo(t); err == nil {
-				tr.meta = b // lưu metainfo để khôi phục phiên / đổi thư mục
+				cur.meta = b
 			}
 		}
-		if ok && !p {
-			tr.startedOnce = true
-		}
-		if ok && len(tr.filePriorities) > 0 {
+		if len(cur.filePriorities) > 0 {
 			files := t.Files()
-			for idx, prio := range tr.filePriorities {
+			for idx, prio := range cur.filePriorities {
 				if idx >= 0 && idx < len(files) {
 					switch prio {
 					case "off":
@@ -317,9 +443,9 @@ func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta 
 				}
 			}
 		}
-		m.mu.Unlock()
-		if ok && !p {
-			t.DownloadAll()
+		// Metadata xong → sắp xếp lại slot / DownloadAll nếu được active.
+		if !cur.paused {
+			m.reconcileQueueLocked()
 		}
 	}()
 	return nil
@@ -334,29 +460,29 @@ func encodeMetainfo(t *torrent.Torrent) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Pause tạm dừng tải xuống và tải lên.
+// Pause tạm dừng tải xuống và tải lên (user pause — nhường slot cho queue).
 func (m *Manager) Pause(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = true
+		tr.queued = false
 		tr.t.DisallowDataDownload()
 		tr.t.DisallowDataUpload()
+		m.reconcileQueueLocked()
 	}
 }
 
-// Resume tiếp tục tải xuống và tải lên.
+// Resume tiếp tục: đưa lên đầu hàng đợi rồi gán slot.
 func (m *Manager) Resume(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = false
-		tr.t.AllowDataDownload()
-		tr.t.AllowDataUpload()
-		if tr.t.Info() != nil && !tr.startedOnce {
-			tr.startedOnce = true
-			tr.t.DownloadAll()
-		}
+		// Ưu tiên torrent user vừa bấm tiếp tục / ưu tiên queue.
+		m.boostSeq++
+		tr.addedAt = time.Unix(0, 0).Add(-time.Duration(m.boostSeq) * time.Second)
+		m.reconcileQueueLocked()
 	}
 }
 
@@ -366,24 +492,25 @@ func (m *Manager) PauseAll() {
 	defer m.mu.Unlock()
 	for _, tr := range m.items {
 		tr.paused = true
+		tr.queued = false
 		tr.t.DisallowDataDownload()
 		tr.t.DisallowDataUpload()
 	}
 }
 
-// ResumeAll tiếp tục tất cả.
+// ResumeAll tiếp tục tất cả (queue sẽ giới hạn số slot active).
 func (m *Manager) ResumeAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	now := time.Now()
+	// Giữ thứ tự tương đối: cộng offset nhỏ theo hash để stable.
+	i := 0
 	for _, tr := range m.items {
 		tr.paused = false
-		tr.t.AllowDataDownload()
-		tr.t.AllowDataUpload()
-		if tr.t.Info() != nil && !tr.startedOnce {
-			tr.startedOnce = true
-			tr.t.DownloadAll()
-		}
+		tr.addedAt = now.Add(time.Duration(i) * time.Millisecond)
+		i++
 	}
+	m.reconcileQueueLocked()
 }
 
 // Remove gỡ torrent khỏi danh sách (không xóa file đã tải trên đĩa).
@@ -392,6 +519,7 @@ func (m *Manager) Remove(hash string) {
 	tr, ok := m.items[hash]
 	if ok {
 		delete(m.items, hash)
+		m.reconcileQueueLocked()
 	}
 	m.mu.Unlock()
 	if ok {
@@ -400,11 +528,13 @@ func (m *Manager) Remove(hash string) {
 }
 
 // SetFilePriority đặt độ ưu tiên cho một tệp: "hi" | "normal" | "off".
+// Giữ mutex trong suốt thao tác để tránh race với Remove/Drop.
 func (m *Manager) SetFilePriority(hash string, index int, prio string) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	tr, ok := m.items[hash]
 	if !ok {
-		m.mu.Unlock()
 		return
 	}
 	if tr.filePriorities == nil {
@@ -417,9 +547,8 @@ func (m *Manager) SetFilePriority(hash string, index int, prio string) {
 		prio = "normal"
 		delete(tr.filePriorities, index)
 	}
-	t := tr.t
-	m.mu.Unlock()
 
+	t := tr.t
 	if t.Info() == nil {
 		return
 	}
@@ -488,9 +617,12 @@ func (tr *tracked) view() TorrentView {
 		} else {
 			v.Name = "Đang lấy metadata…"
 		}
-		if tr.paused {
+		switch {
+		case tr.paused:
 			v.Status = StatusPaused
-		} else {
+		case tr.queued:
+			v.Status = StatusQueued
+		default:
 			v.Status = StatusMetadata
 		}
 		return v
@@ -519,6 +651,8 @@ func (tr *tracked) view() TorrentView {
 		v.Status = StatusSeeding
 	case done:
 		v.Status = StatusCompleted
+	case tr.queued:
+		v.Status = StatusQueued
 	default:
 		v.Status = StatusDownloading
 		if v.DownSpeed > 0 {
@@ -535,6 +669,8 @@ func (m *Manager) Snapshot() Snapshot {
 
 	views := make([]TorrentView, 0, len(m.items))
 	var stats GlobalStats
+	// Tự promote khi có torrent vừa xong (giải phóng slot).
+	m.reconcileQueueLocked()
 	for _, tr := range m.items {
 		v := tr.view()
 		views = append(views, v)
@@ -552,10 +688,16 @@ func (m *Manager) Snapshot() Snapshot {
 			stats.Completed++
 		case StatusPaused:
 			stats.Paused++
+		case StatusQueued:
+			stats.Queued++
 		}
 	}
 	stats.Total = len(views)
-	stats.DhtNodes = m.dhtNodes()
+	stats.MaxActive = m.maxActive
+	stats.BlockSeed = m.blockSeed
+	if m.client != nil {
+		stats.DhtNodes = m.dhtNodes()
+	}
 	stats.DownLimit, stats.UpLimit = m.Limits()
 
 	sort.Slice(views, func(i, j int) bool { return views[i].InfoHash < views[j].InfoHash })
@@ -577,11 +719,18 @@ func (m *Manager) dhtNodes() int {
 }
 
 // Detail trả về chi tiết torrent đang chọn (tệp, peers, trackers, thông tin).
+// Giữ mutex khi đọc để không race với Remove/Drop.
 func (m *Manager) Detail(hash string) Detail {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	d := Detail{
+		InfoHash: hash,
+		Files:    []FileView{},
+		Peers:    []PeerView{},
+		Trackers: []TrackerView{},
+	}
 	tr, ok := m.items[hash]
-	m.mu.Unlock()
-	d := Detail{InfoHash: hash}
 	if !ok {
 		return d
 	}
@@ -621,9 +770,10 @@ func (m *Manager) Detail(hash string) Detail {
 
 	for i, f := range t.Files() {
 		fv := FileView{
-			Index: i,
-			Path:  cleanFilePath(f.Path(), info.Name),
-			Bytes: f.Length(),
+			Index:    i,
+			Path:     cleanFilePath(f.Path(), info.Name),
+			Bytes:    f.Length(),
+			Priority: "normal",
 		}
 		if f.Length() > 0 {
 			fv.Progress = float64(f.BytesCompleted()) / float64(f.Length()) * 100
@@ -633,8 +783,6 @@ func (m *Manager) Detail(hash string) Detail {
 			fv.Priority = "off"
 		case types.PiecePriorityHigh, types.PiecePriorityNow, types.PiecePriorityNext, types.PiecePriorityReadahead:
 			fv.Priority = "hi"
-		default:
-			fv.Priority = "normal"
 		}
 		d.Files = append(d.Files, fv)
 	}
@@ -643,6 +791,11 @@ func (m *Manager) Detail(hash string) Detail {
 
 func cleanFilePath(p, root string) string {
 	p = strings.ReplaceAll(p, "\\", "/")
+	p = strings.TrimPrefix(p, "./")
+	root = strings.ReplaceAll(root, "\\", "/")
+	if root == "" {
+		return p
+	}
 	if len(p) > len(root) && p[len(root)] == '/' && strings.EqualFold(p[:len(root)], root) {
 		return p[len(root)+1:]
 	}

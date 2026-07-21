@@ -142,13 +142,29 @@ func mergeResults(in []Result) []Result {
 			byHash[h] = r
 			continue
 		}
-		// Keep the hit with more seeders; prefer richer magnet/name.
+		// Keep the hit with more seeders; prefer richer magnet/name/size.
+		better := false
 		if r.Seeders > prev.Seeders {
-			if prev.Name != "" && r.Name == h {
+			better = true
+		} else if r.Seeders == prev.Seeders {
+			if len(r.Name) > len(prev.Name) {
+				better = true
+			} else if r.Size > prev.Size && r.Size > 0 {
+				better = true
+			} else if len(r.Magnet) > len(prev.Magnet) {
+				better = true
+			}
+		}
+		if better {
+			if prev.Name != "" && (r.Name == "" || r.Name == h) {
 				r.Name = prev.Name
 			}
-			byHash[h] = r
-		} else if prev.Seeders == r.Seeders && len(r.Name) > len(prev.Name) {
+			if r.Magnet == "" && prev.Magnet != "" {
+				r.Magnet = prev.Magnet
+			}
+			if r.Size == 0 && prev.Size > 0 {
+				r.Size = prev.Size
+			}
 			byHash[h] = r
 		}
 	}

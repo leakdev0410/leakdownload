@@ -34,18 +34,24 @@ type App struct {
 	enableTorrentsCSV bool
 	jackettURL        string
 	jackettAPIKey     string
-	mgrErr            string // lỗi khởi tạo client gần nhất (nếu có)
+	maxActive         int  // 0 = không giới hạn torrent tải song song
+	notifyOnComplete  bool // toast khi tải xong
+	blockSeed         bool // true = chặn seed/upload (mặc định)
+	mgrErr            string
 }
 
 // Settings là cấu hình gửi/nhận với frontend.
 type Settings struct {
-	DownloadDir       string `json:"downloadDir"`
-	DownKBps          int64  `json:"downKBps"` // 0 = không giới hạn
-	UpKBps            int64  `json:"upKBps"`
-	EnableApibay      bool   `json:"enableApibay"`
-	EnableTorrentsCSV bool   `json:"enableTorrentsCSV"`
-	JackettURL        string `json:"jackettURL"`
-	JackettAPIKey     string `json:"jackettAPIKey"`
+	DownloadDir        string `json:"downloadDir"`
+	DownKBps           int64  `json:"downKBps"` // 0 = không giới hạn
+	UpKBps             int64  `json:"upKBps"`
+	EnableApibay       bool   `json:"enableApibay"`
+	EnableTorrentsCSV  bool   `json:"enableTorrentsCSV"`
+	JackettURL         string `json:"jackettURL"`
+	JackettAPIKey      string `json:"jackettAPIKey"`
+	MaxActiveDownloads int    `json:"maxActiveDownloads"` // 0 = không giới hạn
+	NotifyOnComplete   bool   `json:"notifyOnComplete"`
+	BlockSeed          bool   `json:"blockSeed"` // true = chặn seed
 }
 
 type persistedTorrent struct {
@@ -57,14 +63,17 @@ type persistedTorrent struct {
 }
 
 type persisted struct {
-	DownloadDir       string             `json:"downloadDir"`
-	DownKBps          int64              `json:"downKBps"`
-	UpKBps            int64              `json:"upKBps"`
-	EnableApibay      *bool              `json:"enableApibay,omitempty"`
-	EnableTorrentsCSV *bool              `json:"enableTorrentsCSV,omitempty"`
-	JackettURL        string             `json:"jackettURL,omitempty"`
-	JackettAPIKey     string             `json:"jackettAPIKey,omitempty"`
-	Torrents          []persistedTorrent `json:"torrents"`
+	DownloadDir         string             `json:"downloadDir"`
+	DownKBps            int64              `json:"downKBps"`
+	UpKBps              int64              `json:"upKBps"`
+	EnableApibay        *bool              `json:"enableApibay,omitempty"`
+	EnableTorrentsCSV   *bool              `json:"enableTorrentsCSV,omitempty"`
+	JackettURL          string             `json:"jackettURL,omitempty"`
+	JackettAPIKey       string             `json:"jackettAPIKey,omitempty"`
+	MaxActiveDownloads *int               `json:"maxActiveDownloads,omitempty"`
+	NotifyOnComplete   *bool              `json:"notifyOnComplete,omitempty"`
+	BlockSeed          *bool              `json:"blockSeed,omitempty"`
+	Torrents           []persistedTorrent `json:"torrents"`
 }
 
 func NewApp() *App {
@@ -72,6 +81,9 @@ func NewApp() *App {
 		search:            ts.New(),
 		enableApibay:      true,
 		enableTorrentsCSV: true,
+		maxActive:         0,    // mặc định không giới hạn
+		notifyOnComplete:  true, // mặc định bật toast khi xong
+		blockSeed:         true, // mặc định chặn seed
 	}
 }
 
@@ -108,6 +120,15 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.jackettURL = cfg.JackettURL
 	a.jackettAPIKey = cfg.JackettAPIKey
+	if cfg.MaxActiveDownloads != nil && *cfg.MaxActiveDownloads >= 0 {
+		a.maxActive = *cfg.MaxActiveDownloads
+	}
+	if cfg.NotifyOnComplete != nil {
+		a.notifyOnComplete = *cfg.NotifyOnComplete
+	}
+	if cfg.BlockSeed != nil {
+		a.blockSeed = *cfg.BlockSeed
+	}
 	if a.search == nil {
 		a.search = ts.New()
 	}
@@ -115,35 +136,44 @@ func (a *App) startup(ctx context.Context) {
 	if err := a.initManager(); err != nil {
 		wruntime.LogError(ctx, "không khởi tạo được torrent client: "+err.Error())
 		// Vẫn cho UI/search chạy; AddMagnet sẽ thử init lại.
+	} else if mgr := a.getMgr(); mgr != nil {
+		mgr.SetMaxActive(a.maxActive)
+		mgr.SetBlockSeed(a.blockSeed)
 	}
 
-	for _, pt := range cfg.Torrents {
-		if a.mgr == nil {
-			break
-		}
-		var meta []byte
-		if pt.Meta != "" {
-			var err error
-			meta, err = base64.StdEncoding.DecodeString(pt.Meta)
-			if err != nil {
-				wruntime.LogError(ctx, "không giải mã metainfo: "+err.Error())
+	if mgr := a.getMgr(); mgr != nil {
+		for _, pt := range cfg.Torrents {
+			var meta []byte
+			if pt.Meta != "" {
+				var err error
+				meta, err = base64.StdEncoding.DecodeString(pt.Meta)
+				if err != nil {
+					wruntime.LogError(ctx, "không giải mã metainfo: "+err.Error())
+					continue
+				}
+			}
+			if pt.Magnet == "" && len(meta) == 0 {
 				continue
 			}
-		}
-		if err := a.mgr.Restore(te.Source{
-			Magnet:         pt.Magnet,
-			Meta:           meta,
-			Paused:         pt.Paused,
-			DataDir:        pt.DataDir,
-			FilePriorities: pt.FilePriorities,
-		}); err != nil {
-			wruntime.LogError(ctx, "khôi phục torrent thất bại: "+err.Error())
+			if err := mgr.Restore(te.Source{
+				Magnet:         pt.Magnet,
+				Meta:           meta,
+				Paused:         pt.Paused,
+				DataDir:        pt.DataDir,
+				FilePriorities: pt.FilePriorities,
+			}); err != nil {
+				wruntime.LogError(ctx, "khôi phục torrent thất bại: "+err.Error())
+			}
 		}
 	}
 
 	wruntime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		if err := a.ensureManager(); err != nil {
 			wruntime.LogError(a.ctx, "client chưa sẵn sàng (drop): "+err.Error())
+			return
+		}
+		mgr := a.getMgr()
+		if mgr == nil {
 			return
 		}
 		added := false
@@ -156,7 +186,10 @@ func (a *App) startup(ctx context.Context) {
 				wruntime.LogError(a.ctx, "không đọc được file drop: "+err.Error())
 				continue
 			}
-			if err := a.mgr.AddTorrentData(data, true, false); err != nil {
+			if len(data) == 0 {
+				continue
+			}
+			if err := mgr.AddTorrentData(data, true, false); err != nil {
 				wruntime.LogError(a.ctx, "thêm torrent drop thất bại: "+err.Error())
 				continue
 			}
@@ -164,11 +197,18 @@ func (a *App) startup(ctx context.Context) {
 		}
 		if added {
 			a.saveConfig()
-			a.push()
+			a.pushWith(mgr)
 		}
 	})
 
 	go a.pushLoop()
+}
+
+// getMgr trả về torrent manager hiện tại (thread-safe).
+func (a *App) getMgr() *te.Manager {
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
+	return a.mgr
 }
 
 // initManager tạo torrent engine (gọi khi startup hoặc lazy retry).
@@ -185,8 +225,10 @@ func (a *App) initManager() error {
 	mgr, err := te.New(dir, a.downKB*1024, a.upKB*1024)
 	if err != nil {
 		a.mgrErr = err.Error()
-		return err
+		return fmt.Errorf("torrent client chưa sẵn sàng: %s", a.mgrErr)
 	}
+	mgr.SetMaxActive(a.maxActive)
+	mgr.SetBlockSeed(a.blockSeed)
 	a.mgr = mgr
 	a.mgrErr = ""
 	return nil
@@ -194,26 +236,17 @@ func (a *App) initManager() error {
 
 // ensureManager đảm bảo client sẵn sàng; thử khởi tạo lại nếu trước đó fail.
 func (a *App) ensureManager() error {
-	a.cfgMu.Lock()
-	ok := a.mgr != nil
-	a.cfgMu.Unlock()
-	if ok {
+	if a.getMgr() != nil {
 		return nil
 	}
-	if err := a.initManager(); err != nil {
-		if a.mgrErr != "" {
-			return fmt.Errorf("torrent client chưa sẵn sàng: %s", a.mgrErr)
-		}
-		return fmt.Errorf("torrent client chưa sẵn sàng: %w", err)
-	}
-	return nil
+	return a.initManager()
 }
 
 // shutdown đóng engine và lưu phiên khi tắt app.
 func (a *App) shutdown(ctx context.Context) {
 	a.saveConfig()
-	if a.mgr != nil {
-		a.mgr.Close()
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.Close()
 	}
 }
 
@@ -226,18 +259,25 @@ func (a *App) pushLoop() {
 		case <-a.ctx.Done():
 			return
 		case <-ticker.C:
-			if a.mgr != nil {
-				a.mgr.UpdateSpeeds(time.Second)
-				a.push()
+			mgr := a.getMgr()
+			if mgr == nil {
+				continue
 			}
+			mgr.UpdateSpeeds(time.Second)
+			a.pushWith(mgr)
 		}
 	}
 }
 
 func (a *App) push() {
-	if a.mgr != nil {
-		wruntime.EventsEmit(a.ctx, "torrents:update", a.mgr.Snapshot())
+	a.pushWith(a.getMgr())
+}
+
+func (a *App) pushWith(mgr *te.Manager) {
+	if mgr == nil || a.ctx == nil {
+		return
 	}
+	wruntime.EventsEmit(a.ctx, "torrents:update", mgr.Snapshot())
 }
 
 func (a *App) loadConfig() persisted {
@@ -253,34 +293,44 @@ func (a *App) loadConfig() persisted {
 	return cfg
 }
 
+// saveConfig lưu settings (+ danh sách torrent nếu engine sẵn sàng).
+// Không yêu cầu mgr — vẫn lưu được nguồn search / thư mục / limit khi client lỗi.
 func (a *App) saveConfig() {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
-	if a.cfgPath == "" || a.mgr == nil {
+	if a.cfgPath == "" {
 		return
 	}
 	enApibay := a.enableApibay
 	enCSV := a.enableTorrentsCSV
+	maxActive := a.maxActive
+	notify := a.notifyOnComplete
+	blockSeed := a.blockSeed
 	cfg := persisted{
-		DownloadDir:       a.dataDir,
-		DownKBps:          a.downKB,
-		UpKBps:            a.upKB,
-		EnableApibay:      &enApibay,
-		EnableTorrentsCSV: &enCSV,
-		JackettURL:        a.jackettURL,
-		JackettAPIKey:     a.jackettAPIKey,
+		DownloadDir:        a.dataDir,
+		DownKBps:           a.downKB,
+		UpKBps:             a.upKB,
+		EnableApibay:       &enApibay,
+		EnableTorrentsCSV:  &enCSV,
+		JackettURL:         a.jackettURL,
+		JackettAPIKey:      a.jackettAPIKey,
+		MaxActiveDownloads: &maxActive,
+		NotifyOnComplete:   &notify,
+		BlockSeed:          &blockSeed,
 	}
-	for _, s := range a.mgr.Sources() {
-		pt := persistedTorrent{
-			Magnet:         s.Magnet,
-			Paused:         s.Paused,
-			DataDir:        s.DataDir,
-			FilePriorities: s.FilePriorities,
+	if a.mgr != nil {
+		for _, s := range a.mgr.Sources() {
+			pt := persistedTorrent{
+				Magnet:         s.Magnet,
+				Paused:         s.Paused,
+				DataDir:        s.DataDir,
+				FilePriorities: s.FilePriorities,
+			}
+			if len(s.Meta) > 0 {
+				pt.Meta = base64.StdEncoding.EncodeToString(s.Meta)
+			}
+			cfg.Torrents = append(cfg.Torrents, pt)
 		}
-		if len(s.Meta) > 0 {
-			pt.Meta = base64.StdEncoding.EncodeToString(s.Meta)
-		}
-		cfg.Torrents = append(cfg.Torrents, pt)
 	}
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -311,15 +361,22 @@ func (a *App) AddMagnet(uri string, startNow, skipHash bool) string {
 	if err := a.ensureManager(); err != nil {
 		return err.Error()
 	}
+	mgr := a.getMgr()
+	if mgr == nil {
+		return "torrent client chưa sẵn sàng"
+	}
 	uri = strings.TrimSpace(uri)
 	if uri == "" {
 		return "Magnet trống"
 	}
-	if err := a.mgr.AddMagnet(uri, startNow, skipHash); err != nil {
+	if !strings.HasPrefix(strings.ToLower(uri), "magnet:") {
+		return "Magnet không hợp lệ (cần bắt đầu bằng magnet:)"
+	}
+	if err := mgr.AddMagnet(uri, startNow, skipHash); err != nil {
 		return err.Error()
 	}
 	a.saveConfig()
-	a.push()
+	a.pushWith(mgr)
 	return ""
 }
 
@@ -327,6 +384,10 @@ func (a *App) AddMagnet(uri string, startNow, skipHash bool) string {
 func (a *App) AddTorrentBase64(b64 string, startNow, skipHash bool) string {
 	if err := a.ensureManager(); err != nil {
 		return err.Error()
+	}
+	mgr := a.getMgr()
+	if mgr == nil {
+		return "torrent client chưa sẵn sàng"
 	}
 	b64 = strings.TrimSpace(b64)
 	if b64 == "" {
@@ -336,11 +397,14 @@ func (a *App) AddTorrentBase64(b64 string, startNow, skipHash bool) string {
 	if err != nil {
 		return "Không giải mã được base64: " + err.Error()
 	}
-	if err := a.mgr.AddTorrentData(data, startNow, skipHash); err != nil {
+	if len(data) == 0 {
+		return "File torrent trống"
+	}
+	if err := mgr.AddTorrentData(data, startNow, skipHash); err != nil {
 		return err.Error()
 	}
 	a.saveConfig()
-	a.push()
+	a.pushWith(mgr)
 	return ""
 }
 
@@ -348,6 +412,10 @@ func (a *App) AddTorrentBase64(b64 string, startNow, skipHash bool) string {
 func (a *App) AddTorrentFile(startNow, skipHash bool) string {
 	if err := a.ensureManager(); err != nil {
 		return err.Error()
+	}
+	mgr := a.getMgr()
+	if mgr == nil {
+		return "torrent client chưa sẵn sàng"
 	}
 	path, err := wruntime.OpenFileDialog(a.ctx, wruntime.OpenDialogOptions{
 		Title: "Chọn file .torrent",
@@ -365,74 +433,82 @@ func (a *App) AddTorrentFile(startNow, skipHash bool) string {
 	if err != nil {
 		return err.Error()
 	}
-	if err := a.mgr.AddTorrentData(data, startNow, skipHash); err != nil {
+	if len(data) == 0 {
+		return "File torrent trống"
+	}
+	if err := mgr.AddTorrentData(data, startNow, skipHash); err != nil {
 		return err.Error()
 	}
 	a.saveConfig()
-	a.push()
+	a.pushWith(mgr)
 	return ""
 }
 
 // GetSnapshot trả về trạng thái hiện tại (dùng khi frontend vừa load).
 func (a *App) GetSnapshot() te.Snapshot {
-	if a.mgr == nil {
-		return te.Snapshot{Torrents: []te.TorrentView{}}
+	if mgr := a.getMgr(); mgr != nil {
+		return mgr.Snapshot()
 	}
-	return a.mgr.Snapshot()
+	return te.Snapshot{Torrents: []te.TorrentView{}}
 }
 
 // GetDetail trả về chi tiết torrent đang chọn.
 func (a *App) GetDetail(hash string) te.Detail {
-	if a.mgr == nil {
-		return te.Detail{}
+	if mgr := a.getMgr(); mgr != nil {
+		return mgr.Detail(hash)
 	}
-	return a.mgr.Detail(hash)
+	return te.Detail{
+		InfoHash: hash,
+		Files:    []te.FileView{},
+		Peers:    []te.PeerView{},
+		Trackers: []te.TrackerView{},
+	}
 }
 
 func (a *App) PauseTorrent(hash string) {
-	if a.mgr != nil {
-		a.mgr.Pause(hash)
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.Pause(hash)
 		a.saveConfig()
-		a.push()
+		a.pushWith(mgr)
 	}
 }
 
 func (a *App) ResumeTorrent(hash string) {
-	if a.mgr != nil {
-		a.mgr.Resume(hash)
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.Resume(hash)
 		a.saveConfig()
-		a.push()
+		a.pushWith(mgr)
 	}
 }
 
 func (a *App) PauseAll() {
-	if a.mgr != nil {
-		a.mgr.PauseAll()
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.PauseAll()
 		a.saveConfig()
-		a.push()
+		a.pushWith(mgr)
 	}
 }
 
 func (a *App) ResumeAll() {
-	if a.mgr != nil {
-		a.mgr.ResumeAll()
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.ResumeAll()
 		a.saveConfig()
-		a.push()
+		a.pushWith(mgr)
 	}
 }
 
 func (a *App) RemoveTorrent(hash string) {
-	if a.mgr != nil {
-		a.mgr.Remove(hash)
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.Remove(hash)
 		a.saveConfig()
-		a.push()
+		a.pushWith(mgr)
 	}
 }
 
 // SetFilePriority đặt ưu tiên tệp: "hi" | "normal" | "off".
 func (a *App) SetFilePriority(hash string, index int, prio string) {
-	if a.mgr != nil {
-		a.mgr.SetFilePriority(hash, index, prio)
+	if mgr := a.getMgr(); mgr != nil {
+		mgr.SetFilePriority(hash, index, prio)
 		a.saveConfig()
 	}
 }
@@ -442,28 +518,40 @@ func (a *App) GetSettings() Settings {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
 	return Settings{
-		DownloadDir:       a.dataDir,
-		DownKBps:          a.downKB,
-		UpKBps:            a.upKB,
-		EnableApibay:      a.enableApibay,
-		EnableTorrentsCSV: a.enableTorrentsCSV,
-		JackettURL:        a.jackettURL,
-		JackettAPIKey:     a.jackettAPIKey,
+		DownloadDir:        a.dataDir,
+		DownKBps:           a.downKB,
+		UpKBps:             a.upKB,
+		EnableApibay:       a.enableApibay,
+		EnableTorrentsCSV:  a.enableTorrentsCSV,
+		JackettURL:         a.jackettURL,
+		JackettAPIKey:      a.jackettAPIKey,
+		MaxActiveDownloads: a.maxActive,
+		NotifyOnComplete:   a.notifyOnComplete,
+		BlockSeed:          a.blockSeed,
 	}
 }
 
-// SaveSettings áp dụng cấu hình mới (giới hạn tốc độ + thư mục lưu + nguồn search) và lưu lại.
+// SaveSettings áp dụng cấu hình mới (giới hạn tốc độ + queue + thư mục + nguồn search) và lưu lại.
+// Vẫn lưu được settings kể cả khi torrent client chưa sẵn sàng.
 func (a *App) SaveSettings(s Settings) string {
-	if err := a.ensureManager(); err != nil {
-		return err.Error()
-	}
 	if s.DownKBps < 0 {
 		s.DownKBps = 0
 	}
 	if s.UpKBps < 0 {
 		s.UpKBps = 0
 	}
-	a.mgr.SetSpeedLimit(s.DownKBps*1024, s.UpKBps*1024)
+	if s.MaxActiveDownloads < 0 {
+		s.MaxActiveDownloads = 0
+	}
+
+	// Thử khởi tạo engine để áp dụng limit/dir/queue, nhưng không chặn lưu settings.
+	_ = a.ensureManager()
+	mgr := a.getMgr()
+	if mgr != nil {
+		mgr.SetSpeedLimit(s.DownKBps*1024, s.UpKBps*1024)
+		mgr.SetMaxActive(s.MaxActiveDownloads)
+		mgr.SetBlockSeed(s.BlockSeed)
+	}
 
 	a.cfgMu.Lock()
 	a.downKB, a.upKB = s.DownKBps, s.UpKBps
@@ -471,6 +559,9 @@ func (a *App) SaveSettings(s Settings) string {
 	a.enableTorrentsCSV = s.EnableTorrentsCSV
 	a.jackettURL = strings.TrimSpace(s.JackettURL)
 	a.jackettAPIKey = strings.TrimSpace(s.JackettAPIKey)
+	a.maxActive = s.MaxActiveDownloads
+	a.notifyOnComplete = s.NotifyOnComplete
+	a.blockSeed = s.BlockSeed
 	oldDir := a.dataDir
 	a.cfgMu.Unlock()
 
@@ -478,13 +569,17 @@ func (a *App) SaveSettings(s Settings) string {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err.Error()
 		}
-		a.mgr.SetDataDir(dir)
+		if mgr != nil {
+			mgr.SetDataDir(dir)
+		}
 		a.cfgMu.Lock()
 		a.dataDir = dir
 		a.cfgMu.Unlock()
 	}
 	a.saveConfig()
-	a.push()
+	if mgr != nil {
+		a.pushWith(mgr)
+	}
 	return ""
 }
 

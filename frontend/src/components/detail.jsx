@@ -16,6 +16,9 @@ const DEFAULT_SETTINGS = {
   enableTorrentsCSV: true,
   jackettURL: "",
   jackettAPIKey: "",
+  maxActiveDownloads: 0,
+  notifyOnComplete: true,
+  blockSeed: true, // mặc định chặn seed
 };
 
 function bytesToBase64(bytes) {
@@ -335,17 +338,22 @@ function AddModal({ open, onClose, onAdd }) {
   );
 }
 
-function SettingsModal({ open, onClose }) {
+function SettingsModal({ open, onClose, onSaved }) {
+  // Remount body mỗi lần mở → state sạch, không cần reset trong effect.
+  if (!open) return null;
+  return <SettingsModalBody onClose={onClose} onSaved={onSaved} />;
+}
+
+function SettingsModalBody({ onClose, onSaved }) {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     GetSettings().then(s => {
       if (cancelled) return;
-      setSettings(s || { ...DEFAULT_SETTINGS });
+      setSettings({ ...DEFAULT_SETTINGS, ...(s || {}) });
       setLoadError("");
       setReady(true);
     }).catch(e => {
@@ -355,11 +363,16 @@ function SettingsModal({ open, onClose }) {
       setReady(true);
     });
     return () => { cancelled = true; };
-  }, [open]);
+  }, []);
 
   function save() {
     SaveSettings(settings).then(e => {
-      if (e) alert(e); else onClose();
+      if (e) {
+        alert(e);
+      } else {
+        onSaved?.(settings);
+        onClose();
+      }
     }).catch(e => alert("Lỗi: " + e));
   }
 
@@ -372,8 +385,6 @@ function SettingsModal({ open, onClose }) {
   function openDir() {
     OpenDownloadDir().catch(() => {});
   }
-
-  if (!open) return null;
 
   const loading = !ready;
 
@@ -405,6 +416,51 @@ function SettingsModal({ open, onClose }) {
               <div>
                 <label className="fld-lbl">Giới hạn tải lên (KB/s, 0 = vô hạn)</label>
                 <input className="magnet-in" style={{ height: 38 }} type="number" min={0} value={settings.upKBps ?? 0} onChange={e => setSettings(s => ({ ...s, upKBps: Math.max(0, parseInt(e.target.value) || 0) }))} />
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="fld-lbl" style={{ marginBottom: 10 }}>Hàng đợi tải</div>
+              <div>
+                <label className="fld-lbl">Số torrent tải song song (0 = không giới hạn)</label>
+                <input
+                  className="magnet-in"
+                  style={{ height: 38, maxWidth: 160 }}
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={settings.maxActiveDownloads ?? 0}
+                  onChange={e => setSettings(s => ({
+                    ...s,
+                    maxActiveDownloads: Math.min(50, Math.max(0, parseInt(e.target.value, 10) || 0)),
+                  }))}
+                />
+              </div>
+              <div className="hint">
+                Ví dụ đặt 3: chỉ 3 torrent tải cùng lúc, còn lại ở trạng thái Hàng đợi. Khi một cái xong/tạm dừng, slot tự nhường tiếp.
+              </div>
+              <label className="opt" style={{ marginTop: 12, display: "flex" }}>
+                <input
+                  type="checkbox"
+                  checked={settings.notifyOnComplete !== false}
+                  onChange={e => setSettings(s => ({ ...s, notifyOnComplete: e.target.checked }))}
+                />
+                Thông báo Windows khi tải xong
+              </label>
+            </div>
+
+            <div className="settings-section">
+              <div className="fld-lbl" style={{ marginBottom: 10 }}>Seed / chia sẻ</div>
+              <label className="opt" style={{ display: "flex" }}>
+                <input
+                  type="checkbox"
+                  checked={settings.blockSeed !== false}
+                  onChange={e => setSettings(s => ({ ...s, blockSeed: e.target.checked }))}
+                />
+                Chặn seed (không chia sẻ lên mạng)
+              </label>
+              <div className="hint">
+                Mặc định bật — chỉ tải về, không upload. Bỏ tick để mở seed / chia sẻ cho peer khác.
               </div>
             </div>
 
@@ -463,18 +519,27 @@ function SettingsModal({ open, onClose }) {
   );
 }
 
-function StatusBar({ totalDown, totalUp, active, connections, dht, downLimit, upLimit }) {
+function StatusBar({ totalDown, totalUp, active, connections, dht, downLimit, upLimit, queued, maxActive, blockSeed }) {
   const fmtLimit = (v) => v ? fmtSpeed(v) : "∞";
   const animDown = useAnimatedNumber(totalDown || 0, 400);
   const animUp = useAnimatedNumber(totalUp || 0, 400);
   const ds = totalDown ? fmtSpeed(Math.round(animDown)) : "0 KB/s";
   const us = totalUp ? fmtSpeed(Math.round(animUp)) : "0 KB/s";
+  const queueHint = maxActive > 0
+    ? `Queue max ${maxActive}${queued ? ` · ${queued} chờ` : ""}`
+    : (queued ? `${queued} chờ` : null);
   return (
     <footer className="statusbar">
       <span className="sb-item"><span className="sb-dot live" /> {active} đang hoạt động</span>
       <span className="sb-item dl"><Icon name="download" size={14} /> <b className="mono">{ds}</b></span>
       <span className="sb-item ul"><Icon name="upload" size={14} /> <b className="mono">{us}</b></span>
       <span className="sb-spacer" />
+      {blockSeed && (
+        <span className="sb-item" title="Đang chặn seed — mở lại trong Cài đặt"><Icon name="seed" size={14} /> <span className="mono">No seed</span></span>
+      )}
+      {queueHint && (
+        <span className="sb-item" title="Giới hạn tải song song (Cài đặt)"><Icon name="list" size={14} /> <span className="mono">{queueHint}</span></span>
+      )}
       <span className="sb-item"><Icon name="peers" size={14} /> <span className="mono">{connections}</span> kết nối</span>
       <span className="sb-item"><Icon name="globe" size={14} /> DHT: <span className="mono">{dht}</span></span>
       <span className="sb-item"><Icon name="bolt" size={14} /> Giới hạn: <span className="mono">↓{fmtLimit(downLimit)} ↑{fmtLimit(upLimit)}</span></span>
