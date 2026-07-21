@@ -48,11 +48,14 @@ function DetailPanel({ torrent, history, accent, onClose, onFileToggle }) {
   }, [torrent.hash]);
 
   if (!torrent) return null;
+  // peers/seeds trên torrent là số đếm; peerList/trackers/files lấy từ detail.
+  const fileList = detail?.files || [];
+  const peerList = detail?.peers || [];
+  const trackerList = detail?.trackers || [];
   const t = {
     ...torrent,
-    files: detail?.files || [],
-    peers: detail?.peers || [],
-    trackers: detail?.trackers || [],
+    files: fileList,
+    trackers: trackerList,
     pieceLength: detail?.pieceLength,
     numPieces: detail?.numPieces,
     comment: detail?.comment,
@@ -62,9 +65,9 @@ function DetailPanel({ torrent, history, accent, onClose, onFileToggle }) {
   const ratio = t.ratio ?? 0;
 
   const TABS = [
-    { id: "files", label: "Tệp tin", icon: "folder", n: t.files.length },
-    { id: "peers", label: "Peers", icon: "peers", n: t.peers.length },
-    { id: "trackers", label: "Trackers", icon: "globe", n: t.trackers.length },
+    { id: "files", label: "Tệp tin", icon: "folder", n: fileList.length },
+    { id: "peers", label: "Peers", icon: "peers", n: peerList.length },
+    { id: "trackers", label: "Trackers", icon: "globe", n: trackerList.length },
     { id: "info", label: "Thông tin", icon: "info" },
   ];
 
@@ -115,9 +118,9 @@ function DetailPanel({ torrent, history, accent, onClose, onFileToggle }) {
       </div>
 
       <div className="tab-body">
-        {tab === "files" && <div className="tab-fade" key="files"><FilesTab files={t.files} hash={t.hash} onFileToggle={onFileToggle} /></div>}
-        {tab === "peers" && <div className="tab-fade" key="peers"><PeersTab peers={t.peers} /></div>}
-        {tab === "trackers" && <div className="tab-fade" key="trackers"><TrackersTab trackers={t.trackers} /></div>}
+        {tab === "files" && <div className="tab-fade" key="files"><FilesTab files={fileList} hash={t.hash} onFileToggle={onFileToggle} /></div>}
+        {tab === "peers" && <div className="tab-fade" key="peers"><PeersTab peers={peerList} /></div>}
+        {tab === "trackers" && <div className="tab-fade" key="trackers"><TrackersTab trackers={trackerList} /></div>}
         {tab === "info" && <div className="tab-fade" key="info"><InfoTab t={t} /></div>}
       </div>
     </aside>
