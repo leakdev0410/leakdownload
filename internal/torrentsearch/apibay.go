@@ -77,12 +77,51 @@ func (s *Service) searchApibay(ctx context.Context, query string) ([]Result, err
 }
 
 func htmlUnescape(s string) string {
+	// Named entities first (order matters for &amp;).
 	replacer := strings.NewReplacer(
 		"&amp;", "&",
 		"&lt;", "<",
 		"&gt;", ">",
 		"&quot;", `"`,
 		"&#39;", "'",
+		"&apos;", "'",
+		"&nbsp;", " ",
 	)
-	return replacer.Replace(s)
+	s = replacer.Replace(s)
+	// Numeric entities: &#123; and &#x7b;
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] == '&' && i+2 < len(s) && s[i+1] == '#' {
+			j := i + 2
+			hex := false
+			if s[j] == 'x' || s[j] == 'X' {
+				hex = true
+				j++
+			}
+			start := j
+			for j < len(s) && ((s[j] >= '0' && s[j] <= '9') ||
+				(hex && ((s[j] >= 'a' && s[j] <= 'f') || (s[j] >= 'A' && s[j] <= 'F')))) {
+				j++
+			}
+			if j > start && j < len(s) && s[j] == ';' {
+				numStr := s[start:j]
+				var code int64
+				var err error
+				if hex {
+					code, err = strconv.ParseInt(numStr, 16, 32)
+				} else {
+					code, err = strconv.ParseInt(numStr, 10, 32)
+				}
+				if err == nil && code >= 0 && code <= 0x10FFFF {
+					b.WriteRune(rune(code))
+					i = j + 1
+					continue
+				}
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
 }

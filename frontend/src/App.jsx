@@ -14,6 +14,8 @@ import { EventsOn, WindowSetDarkTheme, WindowSetLightTheme } from './wailsjs/run
 
 const MAX_HISTORY = 120;
 const DONE_STATUSES = new Set(["completed", "seeding"]);
+const THEME_KEY = "leakdownload-theme";
+const LEGACY_THEME_KEY = "torrnet-theme";
 
 /** Gọi notification runtime nếu Wails hỗ trợ (CLI mới); bỏ qua im lặng nếu không. */
 async function notifyRuntime(fn, ...args) {
@@ -26,9 +28,28 @@ async function notifyRuntime(fn, ...args) {
   }
 }
 
+function loadThemeDark() {
+  try {
+    const v = localStorage.getItem(THEME_KEY) ?? localStorage.getItem(LEGACY_THEME_KEY);
+    return v === "dark";
+  } catch {
+    return false;
+  }
+}
+
 class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { err: null, key: 0 }; }
-  static getDerivedStateFromError(err) { return { err }; }
+  constructor(props) {
+    super(props);
+    this.state = { err: null, key: 0 };
+  }
+  static getDerivedStateFromError(err) {
+    return { err };
+  }
+  componentDidCatch(err, info) {
+    try {
+      console.error("UI error:", err, info?.componentStack);
+    } catch { /* ignore */ }
+  }
   render() {
     if (this.state.err) {
       return (
@@ -47,6 +68,9 @@ class ErrorBoundary extends React.Component {
 /** Gợi ý icon theo tên torrent (không phải metadata thật). */
 function guessCategory(name) {
   const n = (name || "").toLowerCase();
+  if (/\b(game|gog|steam|fitgirl|repack|rpg|xbox|ps[45]|nintendo|switch)\b/i.test(n)) {
+    return "game";
+  }
   if (/\.(mkv|mp4|avi|mov|wmv|flv|webm|m4v|ts|m2ts|vob)(\b|$)/i.test(n) ||
       /\b(s\d{2}e\d{2}|1080p|720p|2160p|4k|bluray|web-?dl|x264|x265|hevc)\b/i.test(n)) {
     return "video";
@@ -55,11 +79,12 @@ function guessCategory(name) {
     return "audio";
   }
   if (/\.(pdf|epub|mobi|azw3|txt|doc|docx)(\b|$)/i.test(n)) return "docs";
-  if (/\b(game|gog|steam|fitgirl|repack|rpg|xbox|ps[45])\b/i.test(n)) return "game";
-  if (/\.(exe|msi|dmg|pkg|deb|rpm|appimage|apk|zip|rar|7z|tar|gz|iso)(\b|$)/i.test(n) ||
+  if (/\.(exe|msi|dmg|pkg|deb|rpm|appimage|apk)(\b|$)/i.test(n) ||
       /\b(windows|linux|macos|android|setup|installer)\b/i.test(n)) {
     return "software";
   }
+  // Archives alone — generic file (zip/iso may be game or software)
+  if (/\.(zip|rar|7z|tar|gz|iso)(\b|$)/i.test(n)) return "file";
   return "file";
 }
 
@@ -87,24 +112,27 @@ function mapTorrent(tr) {
 
 function App() {
   const [torrents, setTorrents] = useState([]);
-  const [stats, setStats] = useState({});
+  const [stats, setStats] = useState({ blockSeed: true });
   const [selId, setSelId] = useState(null);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [dark, setDark] = useState(() => {
-    try { return localStorage.getItem("torrnet-theme") === "dark"; } catch { return false; }
-  });
+  const [dark, setDark] = useState(loadThemeDark);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [history, setHistory] = useState({});
   const [notifyOnComplete, setNotifyOnComplete] = useState(true);
   const seenRef = useRef(new Set());
   const statusRef = useRef(new Map()); // hash -> last status (phát hiện vừa hoàn tất)
   const [exiting, setExiting] = useState(new Set());
+  const removeTimersRef = useRef(new Map()); // hash -> timeout id
+  const notifyInitRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
-    try { localStorage.setItem("torrnet-theme", dark ? "dark" : "light"); } catch { /* private mode */ }
+    try {
+      localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+      localStorage.removeItem(LEGACY_THEME_KEY);
+    } catch { /* private mode */ }
     if (dark) WindowSetDarkTheme(); else WindowSetLightTheme();
   }, [dark]);
 
@@ -118,12 +146,20 @@ function App() {
 
     let cancelled = false;
     (async () => {
+      if (notifyInitRef.current) return;
+      notifyInitRef.current = true;
       const available = await notifyRuntime("IsNotificationAvailable");
       if (cancelled || available === false) return;
       await notifyRuntime("InitializeNotifications");
       await notifyRuntime("RequestNotificationAuthorization");
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  // Cleanup remove animation timers on unmount.
+  useEffect(() => () => {
+    for (const id of removeTimersRef.current.values()) clearTimeout(id);
+    removeTimersRef.current.clear();
   }, []);
 
   const notifyComplete = useCallback(async (name, hash) => {
@@ -171,17 +207,12 @@ function App() {
         }
       }
 
-      // Toast khi chuyển sang completed/seeding từ trạng thái đang tải.
+      // Toast khi chuyển sang completed/seeding từ bất kỳ trạng thái chưa xong.
       for (const t of next) {
         if (!t.hash) continue;
         const prev = statusRef.current.get(t.hash);
         const now = t.status;
-        if (
-          prev &&
-          !DONE_STATUSES.has(prev) &&
-          DONE_STATUSES.has(now) &&
-          (prev === "downloading" || prev === "metadata" || prev === "queued")
-        ) {
+        if (prev && !DONE_STATUSES.has(prev) && DONE_STATUSES.has(now)) {
           notifyComplete(t.name, t.hash);
         }
         statusRef.current.set(t.hash, now);
@@ -203,6 +234,8 @@ function App() {
       });
 
       setTorrents(next.map(t => ({ ...t, _enter: newHashes.has(t.hash) })));
+      // Bỏ selection nếu torrent đã biến mất khỏi danh sách.
+      setSelId(prev => (prev && hashes.has(prev) ? prev : null));
     }
 
     GetSnapshot().then(s => {
@@ -218,20 +251,56 @@ function App() {
     return () => { if (unsub) unsub(); };
   }, [notifyComplete]);
 
+  const showErr = useCallback((e) => {
+    const msg = e == null ? "" : (typeof e === "string" ? e : (e.message || String(e)));
+    if (msg) alert(msg);
+  }, []);
+
   function unifiedAction(item, kind) {
     if (kind === "remove") {
+      if (!window.confirm(`Xóa torrent "${item.name || item.hash}" khỏi danh sách?\n(File đã tải trên đĩa vẫn giữ.)`)) {
+        return;
+      }
       if (selId === item.hash) setSelId(null);
-      setExiting(prev => { const n = new Set(prev); n.add(item.hash); return n; });
-      setTimeout(() => {
-        RemoveTorrent(item.hash).catch(() => {});
-        setExiting(prev => { const n = new Set(prev); n.delete(item.hash); return n; });
+      // Cancel any previous pending remove for this hash.
+      const prevTimer = removeTimersRef.current.get(item.hash);
+      if (prevTimer) clearTimeout(prevTimer);
+
+      setExiting(prev => {
+        const n = new Set(prev);
+        n.add(item.hash);
+        return n;
+      });
+      const tid = setTimeout(() => {
+        removeTimersRef.current.delete(item.hash);
+        const clearExit = () => {
+          setExiting(prev => {
+            const n = new Set(prev);
+            n.delete(item.hash);
+            return n;
+          });
+        };
+        RemoveTorrent(item.hash)
+          .then(() => { clearExit(); })
+          .catch(err => {
+            showErr("Không xóa được: " + (err?.message || err));
+            clearExit();
+          });
       }, 280);
-    } else if (kind === "pause") PauseTorrent(item.hash).catch(() => {});
-    else if (kind === "resume") ResumeTorrent(item.hash).catch(() => {});
+      removeTimersRef.current.set(item.hash, tid);
+    } else if (kind === "pause") {
+      PauseTorrent(item.hash).catch(err => showErr("Tạm dừng thất bại: " + (err?.message || err)));
+    } else if (kind === "resume") {
+      ResumeTorrent(item.hash).catch(err => showErr("Tiếp tục thất bại: " + (err?.message || err)));
+    }
   }
 
-  const pauseAll = useCallback(() => { PauseAll().catch(() => {}); }, []);
-  const resumeAll = useCallback(() => { ResumeAll().catch(() => {}); }, []);
+  const pauseAll = useCallback(() => {
+    PauseAll().catch(err => alert("Tạm dừng tất cả thất bại: " + (err?.message || err)));
+  }, []);
+  const resumeAll = useCallback(() => {
+    ResumeAll().catch(err => alert("Tiếp tục tất cả thất bại: " + (err?.message || err)));
+  }, []);
 
   function addTorrent({ mode, magnet, fileData, startNow = true, skipHash = false }) {
     if (mode === "magnet") {
@@ -244,7 +313,9 @@ function App() {
   }
 
   const handleFileToggle = useCallback((hash, index, prio) => {
-    SetFilePriority(hash, index, prio).catch(e => console.error(e));
+    SetFilePriority(hash, index, prio).catch(e => {
+      alert("Không đổi ưu tiên tệp: " + (e?.message || e));
+    });
   }, []);
 
   const allItems = torrents;
@@ -289,6 +360,8 @@ function App() {
     : allItems.reduce((s, x) => s + (x.peers || 0), 0);
   const selected = allItems.find(x => x.hash === selId) || null;
   const selHist = (selId && history[selId]) || [];
+  // Mặc định chặn seed khi chưa có stats từ backend.
+  const blockSeed = typeof stats.blockSeed === "boolean" ? stats.blockSeed : true;
 
   function handleSelect(item) { setSelId(item.hash); }
 
@@ -359,7 +432,7 @@ function App() {
           upLimit={stats.upLimit}
           queued={Number(stats.queued) || counts.queued || 0}
           maxActive={Number(stats.maxActive) || 0}
-          blockSeed={stats.blockSeed !== false}
+          blockSeed={blockSeed}
         />
       </div>
 

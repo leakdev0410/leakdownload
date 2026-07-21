@@ -141,7 +141,7 @@ function KPI({ icon, label, value, color }) {
 
 function AnimatedKPI({ icon, label, bps, color }) {
   const v = useAnimatedNumber(bps || 0, 350);
-  const display = bps ? fmtSpeed(Math.round(v)) : "—";
+  const display = fmtSpeed(Math.round(v));
   return (
     <div className="kpi">
       <span className="kpi-ico" style={color ? { color } : undefined}><Icon name={icon} size={15} /></span>
@@ -194,7 +194,7 @@ function PeersTab({ peers }) {
       <thead><tr><th>Địa chỉ IP</th><th>Client</th></tr></thead>
       <tbody>
         {peers.map((p, i) => (
-          <tr key={i}>
+          <tr key={p.addr || `peer-${i}`}>
             <td className="mono">{p.addr}</td>
             <td className="client">{p.client || "—"}</td>
           </tr>
@@ -211,7 +211,7 @@ function TrackersTab({ trackers }) {
       <thead><tr><th>URL</th><th style={{ textAlign: "right" }}>Tier</th></tr></thead>
       <tbody>
         {trackers.map((t, i) => (
-          <tr key={i}>
+          <tr key={`${t.tier ?? 0}:${t.url || i}`}>
             <td className="mono tk-url" title={t.url}>{t.url}</td>
             <td className="mono num">{t.tier}</td>
           </tr>
@@ -275,14 +275,27 @@ function AddModal({ open, onClose, onAdd }) {
 
   function handleFile(f) {
     if (!f) return;
-    setFileName(f.name);
+    const name = f.name || "";
+    if (!/\.torrent$/i.test(name)) {
+      alert("Chỉ hỗ trợ file .torrent");
+      return;
+    }
+    setFileName(name);
+    setFileData(null);
     const reader = new FileReader();
+    reader.onerror = () => {
+      setFileName("");
+      setFileData(null);
+      alert("Không đọc được file");
+    };
     reader.onload = () => {
       try {
         const bytes = new Uint8Array(reader.result);
         setFileData(bytesToBase64(bytes));
       } catch {
+        setFileName("");
         setFileData(null);
+        alert("Không mã hóa được file torrent");
       }
     };
     reader.readAsArrayBuffer(f);
@@ -386,7 +399,9 @@ function SettingsModalBody({ onClose, onSaved }) {
   }
 
   function openDir() {
-    OpenDownloadDir().catch(() => {});
+    OpenDownloadDir()
+      .then(err => { if (err) alert(err); })
+      .catch(e => alert("Không mở được thư mục: " + e));
   }
 
   const loading = !ready;

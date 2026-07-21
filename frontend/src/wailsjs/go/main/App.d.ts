@@ -20,7 +20,7 @@ export function GetSettings():Promise<main.Settings>;
 
 export function GetSnapshot():Promise<torrentengine.Snapshot>;
 
-export function OpenDownloadDir():Promise<void>;
+export function OpenDownloadDir():Promise<string>;
 
 export function PauseAll():Promise<void>;
 

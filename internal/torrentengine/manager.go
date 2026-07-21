@@ -168,8 +168,10 @@ func New(dataDir string, downBytesPerSec, upBytesPerSec int64) (*Manager, error)
 func (m *Manager) config(dataDir string) *torrent.ClientConfig {
 	cfg := torrent.NewDefaultClientConfig()
 	cfg.DataDir = dataDir
-	// Seed client-level: tắt khi đang chặn seed.
-	cfg.Seed = !m.blockSeed
+	// Luôn bật seed ở client-level; chặn/mở upload thật sự qua applyUploadPolicyLocked
+	// (blockSeed). ClientConfig.Seed không đổi được sau NewClient — nếu set false lúc
+	// khởi tạo thì user bật lại seed trong Settings sẽ không ăn.
+	cfg.Seed = true
 	cfg.DownloadRateLimiter = m.downLim
 	cfg.UploadRateLimiter = m.upLim
 
@@ -467,6 +469,8 @@ func (m *Manager) Pause(hash string) {
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = true
 		tr.queued = false
+		tr.downSpeed = 0
+		tr.upSpeed = 0
 		tr.t.DisallowDataDownload()
 		tr.t.DisallowDataUpload()
 		m.reconcileQueueLocked()
@@ -493,6 +497,8 @@ func (m *Manager) PauseAll() {
 	for _, tr := range m.items {
 		tr.paused = true
 		tr.queued = false
+		tr.downSpeed = 0
+		tr.upSpeed = 0
 		tr.t.DisallowDataDownload()
 		tr.t.DisallowDataUpload()
 	}
@@ -502,13 +508,21 @@ func (m *Manager) PauseAll() {
 func (m *Manager) ResumeAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	now := time.Now()
-	// Giữ thứ tự tương đối: cộng offset nhỏ theo hash để stable.
-	i := 0
+	// Sắp theo addedAt hiện tại rồi gán lại timestamp tăng dần → thứ tự queue deterministic.
+	list := make([]*tracked, 0, len(m.items))
 	for _, tr := range m.items {
+		list = append(list, tr)
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		if list[i].addedAt.Equal(list[j].addedAt) {
+			return list[i].t.InfoHash().HexString() < list[j].t.InfoHash().HexString()
+		}
+		return list[i].addedAt.Before(list[j].addedAt)
+	})
+	now := time.Now()
+	for i, tr := range list {
 		tr.paused = false
 		tr.addedAt = now.Add(time.Duration(i) * time.Millisecond)
-		i++
 	}
 	m.reconcileQueueLocked()
 }
@@ -596,7 +610,8 @@ func (m *Manager) UpdateSpeeds(interval time.Duration) {
 }
 
 // view dựng TorrentView từ trạng thái hiện tại của torrent.
-func (tr *tracked) view() TorrentView {
+// blockSeed=true → torrent xong không báo "seeding" (không upload).
+func (tr *tracked) view(blockSeed bool) TorrentView {
 	t := tr.t
 	v := TorrentView{
 		InfoHash:  t.InfoHash().HexString(),
@@ -647,7 +662,7 @@ func (tr *tracked) view() TorrentView {
 	switch {
 	case tr.paused:
 		v.Status = StatusPaused
-	case done && (v.Peers > 0 || v.UpSpeed > 0):
+	case done && !blockSeed && (v.Peers > 0 || v.UpSpeed > 0):
 		v.Status = StatusSeeding
 	case done:
 		v.Status = StatusCompleted
@@ -672,7 +687,7 @@ func (m *Manager) Snapshot() Snapshot {
 	// Tự promote khi có torrent vừa xong (giải phóng slot).
 	m.reconcileQueueLocked()
 	for _, tr := range m.items {
-		v := tr.view()
+		v := tr.view(m.blockSeed)
 		views = append(views, v)
 		stats.DownSpeed += v.DownSpeed
 		stats.UpSpeed += v.UpSpeed

@@ -63,13 +63,13 @@ type persistedTorrent struct {
 }
 
 type persisted struct {
-	DownloadDir         string             `json:"downloadDir"`
-	DownKBps            int64              `json:"downKBps"`
-	UpKBps              int64              `json:"upKBps"`
-	EnableApibay        *bool              `json:"enableApibay,omitempty"`
-	EnableTorrentsCSV   *bool              `json:"enableTorrentsCSV,omitempty"`
-	JackettURL          string             `json:"jackettURL,omitempty"`
-	JackettAPIKey       string             `json:"jackettAPIKey,omitempty"`
+	DownloadDir        string             `json:"downloadDir"`
+	DownKBps           int64              `json:"downKBps"`
+	UpKBps             int64              `json:"upKBps"`
+	EnableApibay       *bool              `json:"enableApibay,omitempty"`
+	EnableTorrentsCSV  *bool              `json:"enableTorrentsCSV,omitempty"`
+	JackettURL         string             `json:"jackettURL,omitempty"`
+	JackettAPIKey      string             `json:"jackettAPIKey,omitempty"`
 	MaxActiveDownloads *int               `json:"maxActiveDownloads,omitempty"`
 	NotifyOnComplete   *bool              `json:"notifyOnComplete,omitempty"`
 	BlockSeed          *bool              `json:"blockSeed,omitempty"`
@@ -449,7 +449,14 @@ func (a *App) GetSnapshot() te.Snapshot {
 	if mgr := a.getMgr(); mgr != nil {
 		return mgr.Snapshot()
 	}
-	return te.Snapshot{Torrents: []te.TorrentView{}}
+	// Client chưa sẵn sàng: vẫn trả blockSeed đúng mặc định/config để UI không nhầm.
+	a.cfgMu.Lock()
+	bs := a.blockSeed
+	a.cfgMu.Unlock()
+	return te.Snapshot{
+		Torrents: []te.TorrentView{},
+		Stats:    te.GlobalStats{BlockSeed: bs},
+	}
 }
 
 // GetDetail trả về chi tiết torrent đang chọn.
@@ -625,10 +632,17 @@ func (a *App) GetDownloadDir() string {
 }
 
 // OpenDownloadDir mở thư mục tải bằng trình quản lý file của hệ điều hành.
-func (a *App) OpenDownloadDir() {
+// Trả "" nếu OK, hoặc thông báo lỗi.
+func (a *App) OpenDownloadDir() string {
 	a.cfgMu.Lock()
 	dir := a.dataDir
 	a.cfgMu.Unlock()
+	if strings.TrimSpace(dir) == "" {
+		return "Chưa có thư mục tải"
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "Không tạo được thư mục: " + err.Error()
+	}
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
@@ -638,5 +652,8 @@ func (a *App) OpenDownloadDir() {
 	default:
 		cmd = exec.Command("xdg-open", dir)
 	}
-	_ = cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return "Không mở được thư mục: " + err.Error()
+	}
+	return ""
 }

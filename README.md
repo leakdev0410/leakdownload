@@ -14,11 +14,11 @@
 
 <br/>
 
-<a href="https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link">
+<a href="https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link">
   <img src="https://img.shields.io/badge/⬇%20Tải%20Setup%20Windows-1.1.4-E76A2E?style=for-the-badge&labelColor=1a1a1a" alt="Download Windows Setup" />
 </a>
 
-**[⬇ Tải bản cài Windows (Google Drive)](https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link)**
+**[⬇ Tải bản cài Windows (Google Drive)](https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link)**
 
 `leakdownload-setup-1.1.4.exe` · Windows 10/11 (x64) · ~7 MB
 
@@ -52,7 +52,7 @@
 
 ## 🖥 Tải về (Windows)
 
-1. Mở link: **[Google Drive — Setup 1.1.4](https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link)**
+1. Mở link: **[Google Drive — Setup 1.1.4](https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link)**
 2. Bấm **Tải xuống**
 3. Chạy `leakdownload-setup-1.1.4.exe`
 4. Chọn shortcut Desktop / Start Menu (tuỳ chọn) → **Cài đặt**
@@ -64,7 +64,7 @@
 <summary><b>Link tải trực tiếp</b></summary>
 
 ```
-https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link
+https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link
 ```
 
 </details>
@@ -262,7 +262,7 @@ MIT License — Copyright (c) 2026 leakdownload contributors
 
 **Made with ☕ · Go + Wails + React · v1.1.4**
 
-[⬇ Tải Setup Windows](https://drive.google.com/file/d/1U3YM3LPr-4rx3x0QlaE3-Dzm8F5_x1RJ/view?usp=drive_link)
+[⬇ Tải Setup Windows](https://drive.google.com/file/d/19py-kYxCQAcNvCUG-gId9_COvfyQuzKq/view?usp=drive_link)
 &nbsp;·&nbsp;
 [GitHub](https://github.com/leakdev0410/leakdownload)
 &nbsp;·&nbsp;

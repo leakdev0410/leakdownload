@@ -16,16 +16,16 @@ type jackettResponse struct {
 }
 
 type jackettItem struct {
-	Title       string  `json:"Title"`
-	Guid        string  `json:"Guid"`
-	Link        string  `json:"Link"`
-	Details     string  `json:"Details"`
-	MagnetUri   string  `json:"MagnetUri"`
-	InfoHash    string  `json:"InfoHash"`
-	Size        int64   `json:"Size"`
-	Seeders     int     `json:"Seeders"`
-	Peers       int     `json:"Peers"`
-	Tracker     string  `json:"Tracker"`
+	Title        string `json:"Title"`
+	Guid         string `json:"Guid"`
+	Link         string `json:"Link"`
+	Details      string `json:"Details"`
+	MagnetUri    string `json:"MagnetUri"`
+	InfoHash     string `json:"InfoHash"`
+	Size         int64  `json:"Size"`
+	Seeders      int    `json:"Seeders"`
+	Peers        int    `json:"Peers"`
+	Tracker      string `json:"Tracker"`
 	CategoryDesc string `json:"CategoryDesc"`
 }
 

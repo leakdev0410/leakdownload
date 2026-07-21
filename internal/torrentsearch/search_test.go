@@ -30,6 +30,31 @@ func TestNormalizeHash(t *testing.T) {
 	if got := NormalizeHash("  abcd  "); got != "" {
 		t.Fatalf("short hash should be empty, got %q", got)
 	}
+	// Base32 v1 (32 chars) → 40 hex
+	const b32 = "FRXSUMGNDHJVKU3UGMZQGB2FK4YUKBGF"
+	got := NormalizeHash(b32)
+	if len(got) != 40 {
+		t.Fatalf("base32 normalize want 40 hex, got %q (len %d)", got, len(got))
+	}
+	// Round-trip: same bytes as hex of decoded base32
+	if got2 := NormalizeHash(got); got2 != got {
+		t.Fatalf("hex re-normalize mismatch: %q vs %q", got, got2)
+	}
+}
+
+func TestMergeResultsKeepsMagnetOnly(t *testing.T) {
+	// No infoHash field but valid magnet with hex btih
+	h := "2c6b6858d61da9543d4231a71db4b1c9264b0685"
+	in := []Result{
+		{Name: "Magnet Only", Magnet: "magnet:?xt=urn:btih:" + h + "&dn=x", Seeders: 3},
+	}
+	out := mergeResults(in)
+	if len(out) != 1 {
+		t.Fatalf("want 1, got %d", len(out))
+	}
+	if out[0].InfoHash != h {
+		t.Fatalf("want hash extracted, got %q", out[0].InfoHash)
+	}
 }
 
 func TestMergeResultsPrefersHigherSeeders(t *testing.T) {

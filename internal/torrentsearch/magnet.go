@@ -1,6 +1,8 @@
 package torrentsearch
 
 import (
+	"encoding/base32"
+	"encoding/hex"
 	"net/url"
 	"strings"
 )
@@ -18,8 +20,9 @@ var defaultTrackers = []string{
 }
 
 // BuildMagnet creates a magnet URI from an info-hash and display name.
+// infoHash should already be normalized hex (40 or 64 chars).
 func BuildMagnet(infoHash, name string) string {
-	h := strings.ToLower(strings.TrimSpace(infoHash))
+	h := NormalizeHash(infoHash)
 	if h == "" {
 		return ""
 	}
@@ -37,19 +40,52 @@ func BuildMagnet(infoHash, name string) string {
 	return b.String()
 }
 
-// NormalizeHash lowercases and strips non-hex characters from an info-hash.
+// NormalizeHash accepts hex (40/64) or base32 (32-char) v1 info-hashes and
+// returns lowercase hex, or "" if invalid.
 func NormalizeHash(h string) string {
-	h = strings.TrimSpace(strings.ToLower(h))
-	var b strings.Builder
-	for _, r := range h {
-		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') {
-			b.WriteRune(r)
-		}
-	}
-	out := b.String()
-	// v1 = 40 hex, v2 truncated sometimes 64 hex (sha256)
-	if len(out) != 40 && len(out) != 64 {
+	h = strings.TrimSpace(h)
+	if h == "" {
 		return ""
 	}
-	return out
+	// Strip common urn prefixes.
+	low := strings.ToLower(h)
+	if strings.HasPrefix(low, "urn:btih:") {
+		h = h[len("urn:btih:"):]
+		low = strings.ToLower(h)
+	}
+
+	// Prefer hex: keep only [0-9a-f].
+	var hexOnly strings.Builder
+	for _, r := range low {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') {
+			hexOnly.WriteRune(r)
+		}
+	}
+	out := hexOnly.String()
+	// v1 = 40 hex, v2 truncated sometimes 64 hex (sha256)
+	if len(out) == 40 || len(out) == 64 {
+		return out
+	}
+
+	// Base32 v1 (32 chars, RFC 4648 alphabet without padding). Common in magnets.
+	var b32 strings.Builder
+	for _, r := range strings.ToUpper(strings.TrimSpace(h)) {
+		if (r >= 'A' && r <= 'Z') || (r >= '2' && r <= '7') {
+			b32.WriteRune(r)
+		}
+	}
+	raw := b32.String()
+	if len(raw) != 32 {
+		return ""
+	}
+	// BitTorrent base32 is unpadded; StdEncoding needs padding to multiple of 8.
+	padded := raw
+	if m := len(padded) % 8; m != 0 {
+		padded += strings.Repeat("=", 8-m)
+	}
+	decoded, err := base32.StdEncoding.DecodeString(padded)
+	if err != nil || len(decoded) != 20 {
+		return ""
+	}
+	return hex.EncodeToString(decoded)
 }

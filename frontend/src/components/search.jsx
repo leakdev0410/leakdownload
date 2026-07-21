@@ -167,13 +167,20 @@ function SearchPanel({ onAdded, knownHashes }) {
   }
 
   function removeHistoryItem(term) {
-    const next = loadSearchHistory().filter(x => x !== term);
+    const low = String(term).toLowerCase();
+    const next = loadSearchHistory().filter(x => x.toLowerCase() !== low);
     saveSearchHistory(next);
     setHistory(next);
   }
 
+  function rowKey(row) {
+    if (row.infoHash) return String(row.infoHash).toLowerCase();
+    if (row.magnet) return row.magnet;
+    return `name:${row.name || ''}|src:${row.source || ''}|sz:${row.size || 0}`;
+  }
+
   async function addOne(row) {
-    const key = row.infoHash || row.magnet;
+    const key = rowKey(row);
     const hash = (row.infoHash || '').toLowerCase();
     if (!row.magnet || adding.has(key) || added.has(key) || (hash && known.has(hash))) return;
     setAdding(prev => new Set(prev).add(key));
@@ -199,8 +206,7 @@ function SearchPanel({ onAdded, knownHashes }) {
   function isAlreadyInList(row) {
     const h = (row.infoHash || '').toLowerCase();
     if (h && known.has(h)) return true;
-    const key = row.infoHash || row.magnet;
-    return added.has(key);
+    return added.has(rowKey(row));
   }
 
   return (
@@ -318,7 +324,7 @@ function SearchPanel({ onAdded, knownHashes }) {
             </thead>
             <tbody>
               {sorted.map((row) => {
-                const key = row.infoHash || row.magnet;
+                const key = rowKey(row);
                 const isAdding = adding.has(key);
                 const already = isAlreadyInList(row);
                 return (

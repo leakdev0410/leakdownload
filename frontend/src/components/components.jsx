@@ -1,5 +1,5 @@
 // components.jsx — shared UI atoms + torrent table + navigation for torrnet.
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Icon } from './icons.jsx';
 import { fmtBytes, fmtSpeed, fmtEta } from '../utils.js';
 import { useAnimatedNumber } from '../useAnimatedNumber.js';
@@ -62,7 +62,7 @@ function CatIcon({ category, size = 16 }) {
 
 function AnimatedSpeed({ bps }) {
   const v = useAnimatedNumber(bps || 0, 350);
-  return <>{bps ? fmtSpeed(Math.round(v)) : "—"}</>;
+  return <>{fmtSpeed(Math.round(v))}</>;
 }
 
 // ── Torrent table ────────────────────────────────────────────────
@@ -129,14 +129,19 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
     [widths],
   );
 
-  function sortBy(k) {
-    if (k === sortKey) setAsc(!asc);
+  const sortBy = useCallback((k) => {
+    if (k === sortKey) setAsc(a => !a);
     else { setSortKey(k); setAsc(true); }
-  }
-  const sorted = [...torrents].sort((a, b) => {
-    const r = compareTorrents(a, b, sortKey);
-    return asc ? r : -r;
-  });
+  }, [sortKey]);
+
+  const sorted = useMemo(() => {
+    const list = [...torrents];
+    list.sort((a, b) => {
+      const r = compareTorrents(a, b, sortKey);
+      return asc ? r : -r;
+    });
+    return list;
+  }, [torrents, sortKey, asc]);
 
   const col = (k) => ({ width: widths[k] });
 

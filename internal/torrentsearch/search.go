@@ -124,22 +124,36 @@ func (s *Service) Search(ctx context.Context, query string, cfg Config) Response
 }
 
 func mergeResults(in []Result) []Result {
-	byHash := make(map[string]Result, len(in))
+	byKey := make(map[string]Result, len(in))
 	for _, r := range in {
 		h := NormalizeHash(r.InfoHash)
-		if h == "" {
-			continue
+		if h == "" && r.Magnet != "" {
+			h = hashFromMagnet(r.Magnet)
 		}
-		r.InfoHash = h
-		if r.Magnet == "" {
+		if h != "" {
+			r.InfoHash = h
+		}
+		if r.Magnet == "" && h != "" {
 			r.Magnet = BuildMagnet(h, r.Name)
 		}
-		if r.Name == "" {
-			r.Name = h
+		// Dedup key: prefer hash; fall back to magnet so magnet-only hits are kept.
+		key := h
+		if key == "" {
+			key = strings.ToLower(strings.TrimSpace(r.Magnet))
 		}
-		prev, ok := byHash[h]
+		if key == "" {
+			continue
+		}
+		if r.Name == "" {
+			if h != "" {
+				r.Name = h
+			} else {
+				r.Name = "Unknown"
+			}
+		}
+		prev, ok := byKey[key]
 		if !ok {
-			byHash[h] = r
+			byKey[key] = r
 			continue
 		}
 		// Keep the hit with more seeders; prefer richer magnet/name/size.
@@ -156,7 +170,7 @@ func mergeResults(in []Result) []Result {
 			}
 		}
 		if better {
-			if prev.Name != "" && (r.Name == "" || r.Name == h) {
+			if prev.Name != "" && (r.Name == "" || r.Name == h || r.Name == "Unknown") {
 				r.Name = prev.Name
 			}
 			if r.Magnet == "" && prev.Magnet != "" {
@@ -165,11 +179,14 @@ func mergeResults(in []Result) []Result {
 			if r.Size == 0 && prev.Size > 0 {
 				r.Size = prev.Size
 			}
-			byHash[h] = r
+			if r.InfoHash == "" && prev.InfoHash != "" {
+				r.InfoHash = prev.InfoHash
+			}
+			byKey[key] = r
 		}
 	}
-	out := make([]Result, 0, len(byHash))
-	for _, r := range byHash {
+	out := make([]Result, 0, len(byKey))
+	for _, r := range byKey {
 		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool {

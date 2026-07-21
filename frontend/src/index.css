@@ -1,3 +1,4 @@
+/* Fonts: system stack first (works offline); optional Google fonts when online. */
 @import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root{
@@ -34,13 +35,13 @@
 *{box-sizing:border-box;}
 html,body{margin:0;height:100%;}
 body{
-  font-family:"Hanken Grotesk",system-ui,Helvetica,Arial,sans-serif;
+  font-family:system-ui,"Segoe UI","Hanken Grotesk",Helvetica,Arial,sans-serif;
   background:var(--bg); color:var(--text);
   font-size:14px; line-height:1.45;
   -webkit-font-smoothing:antialiased;
 }
 #root{height:100vh;}
-.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+.mono{font-family:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;font-variant-numeric:tabular-nums;}
 button{font-family:inherit;cursor:pointer;}
 ::selection{background:color-mix(in oklch,var(--accent) 28%,transparent);}
 
@@ -74,7 +75,7 @@ button{font-family:inherit;cursor:pointer;}
   padding:1px 7px;border-radius:20px;min-width:22px;text-align:center;}
 .nav-item.active .nav-count{background:color-mix(in oklch,var(--accent) 16%,transparent);color:var(--accent);}
 .side-foot{margin-top:auto;}
-.mini-speed{display:flex;justify-content:space-between;font-size:12px;font-family:"JetBrains Mono",monospace;
+.mini-speed{display:flex;justify-content:space-between;font-size:12px;font-family:ui-monospace,"Cascadia Mono","JetBrains Mono",Consolas,monospace;
   border-top:1px solid var(--border);padding-top:12px;}
 .mini-speed .dl,.top-mini .dl{color:var(--accent);display:flex;align-items:center;gap:4px;}
 .mini-speed .ul,.top-mini .ul{color:var(--up);display:flex;align-items:center;gap:4px;}

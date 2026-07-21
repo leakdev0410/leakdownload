@@ -1,21 +1,31 @@
 const GiB = 1024 * 1024 * 1024;
 const MiB = 1024 * 1024;
 
+function safeNum(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v < 0) return null;
+  return v;
+}
+
 function fmtBytes(b) {
-  if (b == null) return "—";
-  if (b >= GiB) return (b / GiB).toFixed(2) + " GB";
-  if (b >= MiB) return (b / MiB).toFixed(1) + " MB";
-  if (b >= 1024) return (b / 1024).toFixed(0) + " KB";
-  return b + " B";
+  const v = safeNum(b);
+  if (v == null) return "—";
+  if (v >= GiB) return (v / GiB).toFixed(2) + " GB";
+  if (v >= MiB) return (v / MiB).toFixed(1) + " MB";
+  if (v >= 1024) return (v / 1024).toFixed(0) + " KB";
+  return Math.round(v) + " B";
 }
+
 function fmtSpeed(bps) {
-  if (!bps) return "0 KB/s";
-  if (bps >= MiB) return (bps / MiB).toFixed(1) + " MB/s";
-  if (bps >= 1024) return (bps / 1024).toFixed(0) + " KB/s";
-  return bps + " B/s";
+  const v = safeNum(bps);
+  if (v == null || v === 0) return "0 KB/s";
+  if (v >= MiB) return (v / MiB).toFixed(1) + " MB/s";
+  if (v >= 1024) return (v / 1024).toFixed(0) + " KB/s";
+  return Math.round(v) + " B/s";
 }
+
 function fmtEta(sec) {
-  if (sec == null || sec === Infinity || sec < 0 || Number.isNaN(sec)) return "∞";
+  if (sec == null || sec === Infinity || sec < 0 || Number.isNaN(sec) || !Number.isFinite(sec)) return "∞";
   if (sec === 0) return "—";
   const s = Math.round(sec);
   if (s < 60) return s + "s";
