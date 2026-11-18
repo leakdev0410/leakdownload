@@ -26,8 +26,8 @@ function fmtSpeed(bps) {
 
 function fmtEta(sec) {
   if (sec == null || sec === Infinity || sec < 0 || Number.isNaN(sec) || !Number.isFinite(sec)) return "∞";
-  if (sec === 0) return "—";
   const s = Math.round(sec);
+  if (s <= 0) return "—";
   if (s < 60) return s + "s";
   if (s < 3600) return Math.floor(s / 60) + "m " + (s % 60) + "s";
   if (s < 86400) return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m";

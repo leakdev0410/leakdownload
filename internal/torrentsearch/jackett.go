@@ -123,22 +123,26 @@ func (s *Service) searchJackett(ctx context.Context, query, baseURL, apiKey stri
 }
 
 func hashFromMagnet(m string) string {
-	// magnet:?xt=urn:btih:HASH
+	// magnet:?xt=urn:btih:HASH or urn:btmh:1220HASH
 	low := strings.ToLower(m)
-	const marker = "urn:btih:"
-	i := strings.Index(low, marker)
-	if i < 0 {
-		return ""
-	}
-	rest := m[i+len(marker):]
-	end := len(rest)
-	for j, r := range rest {
-		if r == '&' || r == '"' {
-			end = j
-			break
+	for _, marker := range []string{"urn:btmh:", "urn:btih:"} {
+		i := strings.Index(low, marker)
+		if i < 0 {
+			continue
+		}
+		rest := m[i+len(marker):]
+		end := len(rest)
+		for j, r := range rest {
+			if r == '&' || r == '"' {
+				end = j
+				break
+			}
+		}
+		if h := NormalizeHash(rest[:end]); h != "" {
+			return h
 		}
 	}
-	return NormalizeHash(rest[:end])
+	return ""
 }
 
 func firstNonEmpty(ss ...string) string {

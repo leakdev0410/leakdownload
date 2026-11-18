@@ -131,6 +131,7 @@ type Manager struct {
 	maxActive int   // 0 = không giới hạn số torrent đang tải
 	boostSeq  int64 // tăng dần khi user ưu tiên torrent trong queue
 	blockSeed bool  // true = không upload/seed (mặc định)
+	closed    bool  // true sau Close — mọi thao tác trở thành no-op / error
 }
 
 const limiterBurst = 1 << 18 // 256 KiB
@@ -206,6 +207,9 @@ func (m *Manager) SetSpeedLimit(downBytesPerSec, upBytesPerSec int64) {
 func (m *Manager) SetMaxActive(n int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	if n < 0 {
 		n = 0
 	}
@@ -224,6 +228,9 @@ func (m *Manager) MaxActive() int {
 func (m *Manager) SetBlockSeed(block bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	m.blockSeed = block
 	for _, tr := range m.items {
 		if tr.paused {
@@ -332,6 +339,9 @@ func (m *Manager) DataDir() string {
 func (m *Manager) SetDataDir(dir string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	m.dataDir = dir
 }
 
@@ -342,6 +352,14 @@ func (m *Manager) AddMagnet(uri string, startNow, skipHash bool) error {
 }
 
 func (m *Manager) addMagnet(uri string, paused bool, dataDir string, filePriorities map[int]string, skipHash bool) error {
+	m.mu.Lock()
+	if m.closed || m.client == nil {
+		m.mu.Unlock()
+		return fmt.Errorf("torrent client đã đóng")
+	}
+	client := m.client
+	m.mu.Unlock()
+
 	spec, err := torrent.TorrentSpecFromMagnetUri(uri)
 	if err != nil {
 		return err
@@ -356,7 +374,7 @@ func (m *Manager) addMagnet(uri string, paused bool, dataDir string, filePriorit
 	if skipHash {
 		spec.DisableInitialPieceCheck = true
 	}
-	t, _, err := m.client.AddTorrentSpec(spec)
+	t, _, err := client.AddTorrentSpec(spec)
 	if err != nil {
 		return err
 	}
@@ -369,6 +387,14 @@ func (m *Manager) AddTorrentData(data []byte, startNow, skipHash bool) error {
 }
 
 func (m *Manager) addTorrentData(data []byte, paused bool, dataDir string, filePriorities map[int]string, skipHash bool) error {
+	m.mu.Lock()
+	if m.closed || m.client == nil {
+		m.mu.Unlock()
+		return fmt.Errorf("torrent client đã đóng")
+	}
+	client := m.client
+	m.mu.Unlock()
+
 	mi, err := metainfo.Load(bytes.NewReader(data))
 	if err != nil {
 		return err
@@ -384,7 +410,7 @@ func (m *Manager) addTorrentData(data []byte, paused bool, dataDir string, fileP
 	if skipHash {
 		spec.DisableInitialPieceCheck = true
 	}
-	t, _, err := m.client.AddTorrentSpec(spec)
+	t, _, err := client.AddTorrentSpec(spec)
 	if err != nil {
 		return err
 	}
@@ -396,6 +422,11 @@ func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta 
 	h := t.InfoHash().HexString()
 
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		t.Drop()
+		return fmt.Errorf("torrent client đã đóng")
+	}
 	if _, exists := m.items[h]; exists {
 		m.mu.Unlock()
 		return fmt.Errorf("torrent đã tồn tại")
@@ -423,6 +454,9 @@ func (m *Manager) register(t *torrent.Torrent, paused bool, magnet string, meta 
 		<-t.GotInfo()
 		m.mu.Lock()
 		defer m.mu.Unlock()
+		if m.closed {
+			return
+		}
 		cur, ok := m.items[h]
 		if !ok || cur.t != t {
 			return
@@ -466,6 +500,9 @@ func encodeMetainfo(t *torrent.Torrent) ([]byte, error) {
 func (m *Manager) Pause(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = true
 		tr.queued = false
@@ -481,6 +518,9 @@ func (m *Manager) Pause(hash string) {
 func (m *Manager) Resume(hash string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	if tr, ok := m.items[hash]; ok {
 		tr.paused = false
 		// Ưu tiên torrent user vừa bấm tiếp tục / ưu tiên queue.
@@ -494,6 +534,9 @@ func (m *Manager) Resume(hash string) {
 func (m *Manager) PauseAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	for _, tr := range m.items {
 		tr.paused = true
 		tr.queued = false
@@ -508,6 +551,9 @@ func (m *Manager) PauseAll() {
 func (m *Manager) ResumeAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 	// Sắp theo addedAt hiện tại rồi gán lại timestamp tăng dần → thứ tự queue deterministic.
 	list := make([]*tracked, 0, len(m.items))
 	for _, tr := range m.items {
@@ -530,6 +576,10 @@ func (m *Manager) ResumeAll() {
 // Remove gỡ torrent khỏi danh sách (không xóa file đã tải trên đĩa).
 func (m *Manager) Remove(hash string) {
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return
+	}
 	tr, ok := m.items[hash]
 	if ok {
 		delete(m.items, hash)
@@ -546,6 +596,9 @@ func (m *Manager) Remove(hash string) {
 func (m *Manager) SetFilePriority(hash string, index int, prio string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 
 	tr, ok := m.items[hash]
 	if !ok {
@@ -584,6 +637,9 @@ func (m *Manager) SetFilePriority(hash string, index int, prio string) {
 func (m *Manager) UpdateSpeeds(interval time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return
+	}
 
 	secs := interval.Seconds()
 	if secs <= 0 {
@@ -682,6 +738,10 @@ func (m *Manager) Snapshot() Snapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.closed {
+		return Snapshot{Torrents: []TorrentView{}, Stats: GlobalStats{BlockSeed: m.blockSeed}}
+	}
+
 	views := make([]TorrentView, 0, len(m.items))
 	var stats GlobalStats
 	// Tự promote khi có torrent vừa xong (giải phóng slot).
@@ -744,6 +804,9 @@ func (m *Manager) Detail(hash string) Detail {
 		Files:    []FileView{},
 		Peers:    []PeerView{},
 		Trackers: []TrackerView{},
+	}
+	if m.closed {
+		return d
 	}
 	tr, ok := m.items[hash]
 	if !ok {
@@ -830,6 +893,9 @@ type Source struct {
 func (m *Manager) Sources() []Source {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.closed {
+		return nil
+	}
 	out := make([]Source, 0, len(m.items))
 	for _, tr := range m.items {
 		var fps map[int]string
@@ -862,10 +928,18 @@ func (m *Manager) Restore(s Source) error {
 	return fmt.Errorf("không có magnet hoặc metainfo")
 }
 
-// Close đóng client và dừng mọi torrent.
+// Close đóng client và dừng mọi torrent. An toàn gọi lặp; sau Close mọi API là no-op/error.
 func (m *Manager) Close() {
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return
+	}
+	m.closed = true
 	c := m.client
+	m.client = nil
+	// Bỏ map items trước khi đóng client — pushLoop/Snapshot không iterate torrent đã chết.
+	m.items = make(map[string]*tracked)
 	m.mu.Unlock()
 	if c != nil {
 		c.Close()

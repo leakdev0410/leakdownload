@@ -20,15 +20,21 @@ var defaultTrackers = []string{
 }
 
 // BuildMagnet creates a magnet URI from an info-hash and display name.
-// infoHash should already be normalized hex (40 or 64 chars).
+// infoHash should already be normalized hex (40 = v1 btih, 64 = v2 sha256 → btmh).
 func BuildMagnet(infoHash, name string) string {
 	h := NormalizeHash(infoHash)
 	if h == "" {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("magnet:?xt=urn:btih:")
-	b.WriteString(h)
+	if len(h) == 64 {
+		// BEP 52: multihash sha2-256 (0x12) + length 32 (0x20) → hex prefix "1220".
+		b.WriteString("magnet:?xt=urn:btmh:1220")
+		b.WriteString(h)
+	} else {
+		b.WriteString("magnet:?xt=urn:btih:")
+		b.WriteString(h)
+	}
 	if n := strings.TrimSpace(name); n != "" {
 		b.WriteString("&dn=")
 		b.WriteString(url.QueryEscape(n))
@@ -47,10 +53,14 @@ func NormalizeHash(h string) string {
 	if h == "" {
 		return ""
 	}
-	// Strip common urn prefixes.
+	// Strip common urn prefixes (v1 btih / v2 btmh).
 	low := strings.ToLower(h)
-	if strings.HasPrefix(low, "urn:btih:") {
+	switch {
+	case strings.HasPrefix(low, "urn:btih:"):
 		h = h[len("urn:btih:"):]
+		low = strings.ToLower(h)
+	case strings.HasPrefix(low, "urn:btmh:"):
+		h = h[len("urn:btmh:"):]
 		low = strings.ToLower(h)
 	}
 
@@ -62,7 +72,11 @@ func NormalizeHash(h string) string {
 		}
 	}
 	out := hexOnly.String()
-	// v1 = 40 hex, v2 truncated sometimes 64 hex (sha256)
+	// Multihash sha2-256 (BEP 52): hex "1220" + 64-char digest.
+	if len(out) == 4+64 && strings.HasPrefix(out, "1220") {
+		out = out[4:]
+	}
+	// v1 = 40 hex, v2 = 64 hex (sha256)
 	if len(out) == 40 || len(out) == 64 {
 		return out
 	}

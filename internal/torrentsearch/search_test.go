@@ -20,6 +20,21 @@ func TestBuildMagnet(t *testing.T) {
 	}
 }
 
+func TestBuildMagnetV2(t *testing.T) {
+	// 64 hex chars = sha256 info-hash (v2)
+	h := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	m := BuildMagnet(h, "V2")
+	if !strings.Contains(m, "urn:btmh:1220"+h) {
+		t.Fatalf("want btmh multihash, got %s", m)
+	}
+	if strings.Contains(m, "urn:btih:") {
+		t.Fatalf("v2 must not use btih alone: %s", m)
+	}
+	if got := hashFromMagnet(m); got != h {
+		t.Fatalf("hashFromMagnet round-trip: got %q want %q", got, h)
+	}
+}
+
 func TestNormalizeHash(t *testing.T) {
 	if got := NormalizeHash("2C6B6858D61DA9543D4231A71DB4B1C9264B0685"); len(got) != 40 {
 		t.Fatalf("got %q", got)

@@ -517,6 +517,7 @@ func (a *App) SetFilePriority(hash string, index int, prio string) {
 	if mgr := a.getMgr(); mgr != nil {
 		mgr.SetFilePriority(hash, index, prio)
 		a.saveConfig()
+		a.pushWith(mgr)
 	}
 }
 

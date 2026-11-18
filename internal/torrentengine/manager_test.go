@@ -2,6 +2,7 @@ package torrentengine
 
 import (
 	"testing"
+	"time"
 
 	"golang.org/x/time/rate"
 )
@@ -61,5 +62,39 @@ func TestMakeLimit(t *testing.T) {
 	}
 	if burst3 != 1<<20 {
 		t.Fatalf("burst want 1MiB, got %d", burst3)
+	}
+}
+
+func TestCloseIsIdempotentAndSafe(t *testing.T) {
+	m := &Manager{
+		items:     make(map[string]*tracked),
+		blockSeed: true,
+	}
+	m.Close()
+	m.Close() // second close must not panic
+
+	m.UpdateSpeeds(time.Second)
+	snap := m.Snapshot()
+	if len(snap.Torrents) != 0 {
+		t.Fatalf("want empty torrents after Close, got %d", len(snap.Torrents))
+	}
+	if !snap.Stats.BlockSeed {
+		t.Fatal("BlockSeed should remain true after Close")
+	}
+	if err := m.AddMagnet("magnet:?xt=urn:btih:2c6b6858d61da9543d4231a71db4b1c9264b0685", true, false); err == nil {
+		t.Fatal("AddMagnet after Close should error")
+	}
+	// No-ops
+	m.Pause("x")
+	m.Resume("x")
+	m.PauseAll()
+	m.ResumeAll()
+	m.Remove("x")
+	m.SetFilePriority("x", 0, "hi")
+	m.SetMaxActive(2)
+	m.SetBlockSeed(false)
+	_ = m.Detail("x")
+	if src := m.Sources(); src != nil && len(src) != 0 {
+		t.Fatalf("Sources after Close want empty, got %d", len(src))
 	}
 }

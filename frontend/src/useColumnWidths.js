@@ -131,7 +131,9 @@ function useColumnWidths(storageKey, defaults, minWidth = 48, options = {}) {
 
   const [containerW, setContainerW] = useState(0);
 
-  weightsRef.current = weights;
+  useEffect(() => {
+    weightsRef.current = weights;
+  }, [weights]);
 
   useEffect(() => {
     optionsRef.current = options;
