@@ -1,10 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>leakdownload</title>
+    <script>
+      // Áp theme trước khi paint để tránh nháy sáng ở chế độ tối.
+      (function () {
+        try {
+          var v = localStorage.getItem("leakdownload-theme") || localStorage.getItem("torrnet-theme");
+          document.documentElement.setAttribute("data-theme", v === "dark" ? "dark" : "light");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

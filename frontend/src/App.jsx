@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { TorrentTable, NavItems, Brand } from './components/components.jsx';
+import { TorrentTable, NavItems, Brand, NAV } from './components/components.jsx';
+import { UiHost } from './components/uihost.jsx';
+import { toast, confirmAsk } from './ui.js';
 import { DetailPanel, AddModal, StatusBar, SettingsModal } from './components/detail.jsx';
 import { SearchPanel } from './components/search.jsx';
 import { Icon } from './components/icons.jsx';
@@ -53,10 +55,10 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.err) {
       return (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16, color: "var(--muted)" }}>
+        <div className="fatal">
           <Icon name="alert" size={40} />
-          <p style={{ fontSize: 15, fontWeight: 600 }}>Đã xảy ra lỗi</p>
-          <pre style={{ fontSize: 12, maxWidth: 600, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{this.state.err.message}</pre>
+          <p className="fatal-title">Đã xảy ra lỗi</p>
+          <pre className="fatal-msg">{this.state.err.message}</pre>
           <button className="btn primary" onClick={() => this.setState(s => ({ err: null, key: s.key + 1 }))}>Thử lại</button>
         </div>
       );
@@ -253,15 +255,19 @@ function App() {
 
   const showErr = useCallback((e) => {
     const msg = e == null ? "" : (typeof e === "string" ? e : (e.message || String(e)));
-    if (msg) alert(msg);
+    if (msg) toast(msg);
   }, []);
 
-  function unifiedAction(item, kind) {
+  async function unifiedAction(item, kind) {
     if (kind === "remove") {
-      if (!window.confirm(`Xóa torrent "${item.name || item.hash}" khỏi danh sách?\n(File đã tải trên đĩa vẫn giữ.)`)) {
-        return;
-      }
-      if (selId === item.hash) setSelId(null);
+      const ok = await confirmAsk({
+        title: "Xóa khỏi danh sách?",
+        message: `"${item.name || item.hash}" sẽ bị xóa khỏi danh sách. File đã tải trên đĩa vẫn được giữ.`,
+        confirmLabel: "Xóa",
+        danger: true,
+      });
+      if (!ok) return;
+      setSelId(prev => (prev === item.hash ? null : prev));
       // Cancel any previous pending remove for this hash.
       const prevTimer = removeTimersRef.current.get(item.hash);
       if (prevTimer) clearTimeout(prevTimer);
@@ -296,25 +302,32 @@ function App() {
   }
 
   const pauseAll = useCallback(() => {
-    PauseAll().catch(err => alert("Tạm dừng tất cả thất bại: " + (err?.message || err)));
+    PauseAll().catch(err => toast("Tạm dừng tất cả thất bại: " + (err?.message || err)));
   }, []);
   const resumeAll = useCallback(() => {
-    ResumeAll().catch(err => alert("Tiếp tục tất cả thất bại: " + (err?.message || err)));
+    ResumeAll().catch(err => toast("Tiếp tục tất cả thất bại: " + (err?.message || err)));
   }, []);
 
-  function addTorrent({ mode, magnet, fileData, startNow = true, skipHash = false }) {
-    if (mode === "magnet") {
-      AddMagnet(magnet || "", startNow, skipHash).then(e => e && alert(e)).catch(e => alert("Lỗi: " + e));
-    } else if (fileData) {
-      AddTorrentBase64(fileData, startNow, skipHash).then(e => e && alert(e)).catch(e => alert("Lỗi: " + e));
-    } else {
-      AddTorrentFile(startNow, skipHash).then(e => e && alert(e)).catch(e => alert("Lỗi: " + e));
+  /** Returns error string (empty = OK). Keeps AddModal open on failure. */
+  async function addTorrent({ mode, magnet, fileData, startNow = true, skipHash = false }) {
+    try {
+      let err = "";
+      if (mode === "magnet") {
+        err = await AddMagnet(magnet || "", startNow, skipHash);
+      } else if (fileData) {
+        err = await AddTorrentBase64(fileData, startNow, skipHash);
+      } else {
+        err = await AddTorrentFile(startNow, skipHash);
+      }
+      return err || "";
+    } catch (e) {
+      return String(e?.message || e || "Lỗi không xác định");
     }
   }
 
   const handleFileToggle = useCallback((hash, index, prio) => {
     SetFilePriority(hash, index, prio).catch(e => {
-      alert("Không đổi ưu tiên tệp: " + (e?.message || e));
+      toast("Không đổi ưu tiên tệp: " + (e?.message || e));
     });
   }, []);
 
@@ -365,41 +378,55 @@ function App() {
 
   function handleSelect(item) { setSelId(item.hash); }
 
+  const pageTitle = NAV.find(n => n.id === filter)?.label || "Tất cả";
+  const pageMeta = isSearch
+    ? "Tìm torrent từ nguồn công khai và Jackett."
+    : [
+        `${visible.length} torrent`,
+        query ? `lọc “${query}”` : null,
+        `↓ ${fmtSpeed(totalDown)}`,
+        `↑ ${fmtSpeed(totalUp)}`,
+      ].filter(Boolean).join(" · ");
+
   return (
     <ErrorBoundary>
-    <div className="app lay-side">
-      <aside className="sidebar">
+    <div className="app">
+      <header className="topbar glass">
         <Brand />
-        <NavItems active={filter} onNav={setFilter} counts={counts} vertical={true} />
-        <div className="side-foot">
-          <div className="side-actions">
-            <button className="ibtn" title={dark ? "Chế độ sáng" : "Chế độ tối"} onClick={() => setDark(d => !d)}>
-              <Icon name={dark ? "sun" : "moon"} size={16} />
-            </button>
-            <button className="ibtn" title="Cài đặt" onClick={() => setSettingsOpen(true)}>
-              <Icon name="cog" size={16} />
-            </button>
-          </div>
-          <div className="mini-speed">
-            <span className="dl"><Icon name="download" size={13} /> {fmtSpeed(totalDown)}</span>
-            <span className="ul"><Icon name="upload" size={13} /> {fmtSpeed(totalUp)}</span>
-          </div>
+        <NavItems active={filter} onNav={setFilter} counts={counts} />
+        <div className="top-actions">
+          <button className="ibtn" title={dark ? "Chế độ sáng" : "Chế độ tối"} aria-label={dark ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"} onClick={() => setDark(d => !d)}>
+            <Icon name={dark ? "sun" : "moon"} size={18} />
+          </button>
+          <button className="ibtn" title="Cài đặt" aria-label="Mở cài đặt" onClick={() => setSettingsOpen(true)}>
+            <Icon name="cog" size={18} />
+          </button>
         </div>
-      </aside>
+      </header>
 
-      <div className="main">
-        {!isSearch && (
-          <div className="toolbar" style={{ flexWrap: "wrap", gap: "6px 10px" }}>
-            <button className="btn primary" onClick={() => setAddOpen(true)}><Icon name="plus" size={16} /> Thêm torrent</button>
-            <div className="tb-group">
-              <button className="btn ghost" onClick={resumeAll}><Icon name="play" size={15} /> Tất cả</button>
-              <button className="btn ghost" onClick={pauseAll}><Icon name="pause" size={15} /> Tất cả</button>
-            </div>
-            <div className="search"><Icon name="search" size={16} /><input placeholder="Lọc danh sách..." value={query} onChange={e => setQuery(e.target.value)} />{query && <button className="ibtn sm" onClick={() => setQuery("")}><Icon name="close" size={13} /></button>}</div>
+      <main className="main">
+        <div className="page-head">
+          <div className="page-titles">
+            <h1 className="page-title">{pageTitle}</h1>
+            <p className="page-meta">{pageMeta}</p>
           </div>
-        )}
+          {!isSearch && (
+            <div className="toolbar">
+              <div className="search">
+                <Icon name="search" size={16} />
+                <input aria-label="Lọc danh sách" placeholder="Lọc danh sách" value={query} onChange={e => setQuery(e.target.value)} />
+                {query && <button className="ibtn sm" aria-label="Xóa bộ lọc" onClick={() => setQuery("")}><Icon name="close" size={13} /></button>}
+              </div>
+              <div className="tb-group">
+                <button className="btn ghost" title="Tiếp tục tất cả" aria-label="Tiếp tục tất cả" onClick={resumeAll}><Icon name="play" size={15} /> Tất cả</button>
+                <button className="btn ghost" title="Tạm dừng tất cả" aria-label="Tạm dừng tất cả" onClick={pauseAll}><Icon name="pause" size={15} /> Tất cả</button>
+              </div>
+              <button className="btn primary" onClick={() => setAddOpen(true)}><Icon name="plus" size={16} /> Thêm torrent</button>
+            </div>
+          )}
+        </div>
 
-        <div className="content">
+        <div className="content view-fade" key={isSearch ? "search" : "list"}>
           {isSearch ? (
             <SearchPanel
               onAdded={() => setFilter("downloading")}
@@ -407,7 +434,7 @@ function App() {
             />
           ) : (
             <>
-              <div className="list-wrap">
+              <div className="list-wrap card">
                 {visible.length ? (
                   <TorrentTable
                     torrents={visible}
@@ -420,8 +447,12 @@ function App() {
                   />
                 ) : (
                   <div className="empty">
-                    <Icon name="search" size={28} />
-                    <p>Không có mục nào. Thêm torrent hoặc mở tab Tìm kiếm.</p>
+                    <span className="empty-ico"><Icon name={query ? "search" : "download"} size={26} /></span>
+                    <p className="empty-title">{query ? "Không có kết quả khớp" : "Chưa có torrent nào"}</p>
+                    <p>{query ? "Thử từ khóa khác hoặc xóa bộ lọc." : "Thêm một torrent hoặc mở mục Tìm kiếm để bắt đầu."}</p>
+                    {!query && (
+                      <button className="btn primary" onClick={() => setAddOpen(true)}><Icon name="plus" size={16} /> Thêm torrent</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -451,7 +482,7 @@ function App() {
           maxActive={Number(stats.maxActive) || 0}
           blockSeed={blockSeed}
         />
-      </div>
+      </main>
 
       <AddModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addTorrent} />
       <SettingsModal
@@ -463,6 +494,7 @@ function App() {
           }
         }}
       />
+      <UiHost />
     </div>
     </ErrorBoundary>
   );

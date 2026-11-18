@@ -2,28 +2,30 @@ import { useMemo } from 'react';
 
 let _chartId = 0;
 
-function SpeedChart({ history, height = 120, accent = "#E76A2E", up = "#1f9e8f" }) {
+function SpeedChart({ history, height = 120, accent = "var(--accent)", up = "var(--up)" }) {
   const pts = history.length ? history : [{ d: 0, u: 0 }];
   const ids = useMemo(() => { const id = ++_chartId; return { gd: `sgd${id}`, gu: `sgu${id}` }; }, []);
   const w = 600;
   const h = height;
   const pad = 6;
   const max = Math.max(1, ...pts.map((p) => Math.max(p.d, p.u))) * 1.2;
-  const n = Math.max(pts.length, 2);
-  const x = (i) => pad + (i / (n - 1)) * (w - pad * 2);
+  const n = pts.length;
+  // Single sample: center the point so marker isn't pinned to a fake right edge.
+  const x = (i) => (n <= 1 ? w / 2 : pad + (i / (n - 1)) * (w - pad * 2));
   const y = (v) => h - pad - (v / max) * (h - pad * 2);
+  const lastIdx = Math.max(0, n - 1);
 
   function area(key) {
     let d = `M ${x(0)} ${h - pad}`;
     pts.forEach((p, i) => { d += ` L ${x(i)} ${y(p[key])}`; });
-    d += ` L ${x(n - 1)} ${h - pad} Z`;
+    d += ` L ${x(lastIdx)} ${h - pad} Z`;
     return d;
   }
   function line(key) {
     return pts.map((p, i) => `${i ? "L" : "M"} ${x(i)} ${y(p[key])}`).join(" ");
   }
 
-  const last = pts[pts.length - 1];
+  const last = pts[lastIdx];
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: "100%", height, display: "block" }}>
       <defs>
@@ -44,7 +46,7 @@ function SpeedChart({ history, height = 120, accent = "#E76A2E", up = "#1f9e8f" 
       <path d={line("u")} fill="none" stroke={up} strokeWidth="1.6" strokeLinejoin="round" />
       <path d={area("d")} fill={`url(#${ids.gd})`} />
       <path d={line("d")} fill="none" stroke={accent} strokeWidth="2" strokeLinejoin="round" />
-      <circle cx={x(n - 1)} cy={y(last.d)} r="3" fill={accent} />
+      <circle cx={x(lastIdx)} cy={y(last.d)} r="3" fill={accent} />
     </svg>
   );
 }

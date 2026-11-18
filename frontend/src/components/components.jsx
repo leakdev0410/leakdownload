@@ -1,5 +1,5 @@
 // components.jsx — shared UI atoms + torrent table + navigation for torrnet.
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Icon } from './icons.jsx';
 import { fmtBytes, fmtSpeed, fmtEta } from '../utils.js';
 import { useAnimatedNumber } from '../useAnimatedNumber.js';
@@ -9,7 +9,7 @@ const CAT_ICON = { video: "video", audio: "audio", software: "software", docs: "
 
 const STATUS_META = {
   metadata: { label: "Đang lấy TT", color: "var(--warn)", dot: "var(--warn)" },
-  downloading: { label: "Đang tải", color: "var(--accent)", dot: "var(--accent)" },
+  downloading: { label: "Đang tải", color: "var(--link)", dot: "var(--accent)" },
   seeding: { label: "Đang seed", color: "var(--up)", dot: "var(--up)" },
   completed: { label: "Hoàn tất", color: "var(--ok)", dot: "var(--ok)" },
   paused: { label: "Tạm dừng", color: "var(--muted)", dot: "var(--muted)" },
@@ -30,7 +30,7 @@ function StatusPill({ status }) {
 function ProgressView({ value, status, style: ps, size = "row" }) {
   const pct = Math.round(value * 100);
   const done = value >= 1;
-  const color = status === "seeding" || done ? "var(--up)" : status === "paused" || status === "queued" ? "var(--muted)" : "var(--accent)";
+  const color = status === "seeding" || done ? "var(--up)" : status === "paused" || status === "queued" ? "var(--muted-fill)" : "var(--accent)";
   if (ps === "ring") {
     const r = size === "row" ? 11 : 26;
     const sw = size === "row" ? 3 : 5;
@@ -197,7 +197,7 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
                 </span>
                 <span className="name-text" title={t.name}>{t.name}</span>
               </td>
-              <td className="mono num" title={t.size ? String(t.size) + " B" : undefined}>{t.size ? fmtBytes(t.size) : "—"}</td>
+              <td className="mono num" title={Number.isFinite(t.size) && t.size >= 0 ? String(t.size) + " B" : undefined}>{Number.isFinite(t.size) && t.size >= 0 ? fmtBytes(t.size) : "—"}</td>
               <td className="cell-prog">
                 <ProgressView value={t.progress} status={t.status} style={progressStyle} />
                 <span className="mono pct">{Math.round(t.progress * 100)}%</span>
@@ -207,7 +207,7 @@ function TorrentTable({ torrents, selectedId, onSelect, onAction, density, progr
               </td>
               <td className="mono num dl"><AnimatedSpeed bps={t.down} /></td>
               <td className="mono num ul"><AnimatedSpeed bps={t.up} /></td>
-              <td className="mono num">{t.peers || "—"}</td>
+              <td className="mono num">{Number.isFinite(t.peers) ? t.peers : "—"}</td>
               <td className="mono num">{t.status === "downloading" ? fmtEta(eta) : "—"}</td>
               <td className="mono num center" style={{ color: (t.ratio ?? 0) >= 1 ? "var(--up)" : "var(--muted)" }}>{(t.ratio ?? 0).toFixed(2)}</td>
               <td className="cell-act" onClick={(e) => e.stopPropagation()}>
@@ -242,43 +242,131 @@ function RowActions({ t, onAction }) {
   );
 }
 
-// ── Navigation (sidebar or topbar layout) ────────────────────────
+// ── Navigation (glass top bar) ───────────────────────────────────
 const NAV = [
   { id: "search", label: "Tìm kiếm", icon: "search" },
   { id: "all", label: "Tất cả", icon: "list" },
   { id: "downloading", label: "Đang tải", icon: "download" },
-  { id: "queued", label: "Hàng đợi", icon: "list" },
+  { id: "queued", label: "Hàng đợi", icon: "queue" },
   { id: "seeding", label: "Đang seed", icon: "upload" },
   { id: "completed", label: "Hoàn tất", icon: "check" },
   { id: "paused", label: "Tạm dừng", icon: "pause" },
 ];
 
-function Brand({ compact }) {
+function Brand() {
   return (
     <div className="brand">
-      <div className="brand-mark"><Icon name="download" size={18} /></div>
-      {!compact && (
-        <div className="brand-text">
-          <div className="brand-name">leak<span>download</span></div>
-          <div className="brand-sub">Torrent client</div>
-        </div>
-      )}
+      <div className="brand-mark"><Icon name="download" size={16} /></div>
+      <div className="brand-name">leakdownload</div>
     </div>
   );
 }
 
-function NavItems({ active, onNav, counts, vertical }) {
+// ── Segmented control with a sliding indicator (spring) ──────────
+// kind="tabs": role=tablist/tab + aria-selected. kind="nav": buttons + aria-current.
+function Segmented({ items, value, onChange, className = "", kind = "tabs", label }) {
+  const ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const act = el.querySelector('[data-active="true"]');
+      if (!act) { el.removeAttribute("data-m"); return; }
+      el.style.setProperty("--ix", act.offsetLeft + "px");
+      el.style.setProperty("--iw", act.offsetWidth + "px");
+      el.setAttribute("data-m", "");
+    };
+    measure();
+    // Bật transition sau khung hình đầu để indicator không trượt từ 0.
+    const raf = requestAnimationFrame(() => el.setAttribute("data-ready", ""));
+    let ro;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(measure);
+      ro.observe(el);
+    }
+    return () => { cancelAnimationFrame(raf); ro?.disconnect(); };
+  });
+
+  const isTabs = kind === "tabs";
   return (
-    <nav className={"nav " + (vertical ? "nav-v" : "nav-h")}>
-      {NAV.map((n) => (
-        <button key={n.id} className={"nav-item" + (active === n.id ? " active" : "")} onClick={() => onNav(n.id)}>
-          <Icon name={n.icon} size={17} />
-          <span className="nav-label">{n.label}</span>
-          {counts[n.id] != null && <span className="nav-count mono">{counts[n.id]}</span>}
-        </button>
-      ))}
-    </nav>
+    <div
+      ref={ref}
+      className={"seg " + className}
+      role={isTabs ? "tablist" : undefined}
+      aria-label={label}
+    >
+      <span className="seg-ind" aria-hidden="true" />
+      {items.map((it) => {
+        const on = value === it.id;
+        return (
+          <button
+            key={it.id}
+            type="button"
+            className={"seg-item" + (on ? " on" : "")}
+            data-active={on ? "true" : "false"}
+            role={isTabs ? "tab" : undefined}
+            aria-selected={isTabs ? on : undefined}
+            aria-current={!isTabs && on ? "page" : undefined}
+            title={it.title || it.label}
+            disabled={it.disabled}
+            onClick={() => onChange(it.id)}
+          >
+            {it.icon && <Icon name={it.icon} size={16} />}
+            <span className="seg-label">{it.label}</span>
+            {it.badge != null && it.badge !== 0 && <span className="seg-count">{it.badge}</span>}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-export { StatusPill, ProgressView, CatIcon, TorrentTable, NavItems, Brand, NAV, STATUS_META };
+// ── Toggle switch (native checkbox, role=switch) ─────────────────
+function Switch({ checked, onChange, disabled, children, hint }) {
+  return (
+    <label className={"sw" + (disabled ? " is-disabled" : "")}>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="sw-track"><span className="sw-thumb" /></span>
+      <span className="sw-text">
+        <span className="sw-label">{children}</span>
+        {hint && <span className="sw-hint">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+// ── Native <dialog> modal ────────────────────────────────────────
+function Dialog({ onClose, className = "", labelledBy, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return undefined;
+    if (!d.open) d.showModal();
+    return () => { if (d.open) d.close(); };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={"dlg " + className}
+      aria-labelledby={labelledBy}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      onMouseDown={(e) => { if (e.target === ref.current) onClose(); }}
+    >
+      {children}
+    </dialog>
+  );
+}
+
+function NavItems({ active, onNav, counts }) {
+  const items = NAV.map((n) => ({ id: n.id, label: n.label, icon: n.icon, badge: counts[n.id] }));
+  return <Segmented items={items} value={active} onChange={onNav} kind="nav" className="seg-nav" label="Danh mục" />;
+}
+
+export { StatusPill, ProgressView, CatIcon, TorrentTable, NavItems, Brand, Segmented, Switch, Dialog, NAV, STATUS_META };

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Icon } from './icons.jsx';
 import { SpeedChart } from './chart.jsx';
 import { fmtBytes, fmtSpeed, fmtEta } from '../utils.js';
-import { StatusPill, ProgressView } from './components.jsx';
+import { StatusPill, ProgressView, Segmented, Switch, Dialog } from './components.jsx';
 import { useAnimatedNumber } from '../useAnimatedNumber.js';
+import { toast } from '../ui.js';
 import {
   GetDetail, GetSettings, SaveSettings, ChooseDownloadDir, OpenDownloadDir,
 } from '../wailsjs/go/main/App.js';
@@ -95,7 +96,7 @@ function DetailPanel({ torrent, history, accent, onClose, onFileToggle }) {
       </div>
 
       <div className="detail-kpis">
-        <AnimatedKPI icon="download" label="Tốc độ tải" bps={t.down} color="var(--accent)" />
+        <AnimatedKPI icon="download" label="Tốc độ tải" bps={t.down} color="var(--link)" />
         <AnimatedKPI icon="upload" label="Tốc độ lên" bps={t.up} color="var(--up)" />
         <KPI icon="peers" label="Peers / Seeds" value={`${t.peers} / ${t.seeds}`} />
         <KPI icon="seed" label="Tỷ lệ chia sẻ" value={ratio.toFixed(2)} color={ratio >= 1 ? "var(--up)" : undefined} />
@@ -110,14 +111,16 @@ function DetailPanel({ torrent, history, accent, onClose, onFileToggle }) {
       </div>
 
       <div className="tabs">
-        {TABS.map((tb) => (
-          <button key={tb.id} className={"tab" + (tab === tb.id ? " active" : "")} onClick={() => setTab(tb.id)}>
-            <Icon name={tb.icon} size={15} />{tb.label}{tb.n != null && <span className="tab-n mono">{tb.n}</span>}
-          </button>
-        ))}
+        <Segmented
+          className="seg-fill"
+          label="Chi tiết torrent"
+          value={tab}
+          onChange={setTab}
+          items={TABS.map((tb) => ({ id: tb.id, label: tb.label, badge: tb.n }))}
+        />
       </div>
 
-      <div className="tab-body">
+      <div className="tab-body" role="tabpanel">
         {tab === "files" && <div className="tab-fade" key="files"><FilesTab files={fileList} hash={t.hash} onFileToggle={onFileToggle} /></div>}
         {tab === "peers" && <div className="tab-fade" key="peers"><PeersTab peers={peerList} /></div>}
         {tab === "trackers" && <div className="tab-fade" key="trackers"><TrackersTab trackers={trackerList} /></div>}
@@ -175,7 +178,7 @@ function FilesTab({ files, hash, onFileToggle }) {
               <button
                 className={"prio prio-" + (f.priority === "hi" ? "high" : f.priority === "off" ? "low" : "normal")}
                 onClick={() => cyclePriority(f, hash)}
-                style={{ cursor: "pointer", border: "none", fontFamily: "inherit" }}
+                title="Bấm để đổi ưu tiên"
               >
                 {f.priority === "hi" ? "Cao" : f.priority === "off" ? "Tắt" : "Thường"}
               </button>
@@ -245,6 +248,12 @@ function InfoTab({ t }) {
 }
 
 function AddModal({ open, onClose, onAdd }) {
+  // Remount body mỗi lần mở → state sạch.
+  if (!open) return null;
+  return <AddModalBody onClose={onClose} onAdd={onAdd} />;
+}
+
+function AddModalBody({ onClose, onAdd }) {
   const [mode, setMode] = useState("magnet");
   const [magnet, setMagnet] = useState("");
   const [drag, setDrag] = useState(false);
@@ -252,24 +261,14 @@ function AddModal({ open, onClose, onAdd }) {
   const [fileData, setFileData] = useState(null);
   const [startNow, setStartNow] = useState(true);
   const [skipHash, setSkipHash] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  if (!open) return null;
   const valid = mode === "magnet"
     ? magnet.trim().toLowerCase().startsWith("magnet:")
     : !!(fileName && fileData);
 
-  function resetForm() {
-    setMode("magnet");
-    setMagnet("");
-    setFileName("");
-    setFileData(null);
-    setStartNow(true);
-    setSkipHash(false);
-    setDrag(false);
-  }
-
   function handleClose() {
-    resetForm();
+    if (submitting) return;
     onClose();
   }
 
@@ -277,7 +276,7 @@ function AddModal({ open, onClose, onAdd }) {
     if (!f) return;
     const name = f.name || "";
     if (!/\.torrent$/i.test(name)) {
-      alert("Chỉ hỗ trợ file .torrent");
+      toast("Chỉ hỗ trợ file .torrent");
       return;
     }
     setFileName(name);
@@ -286,7 +285,7 @@ function AddModal({ open, onClose, onAdd }) {
     reader.onerror = () => {
       setFileName("");
       setFileData(null);
-      alert("Không đọc được file");
+      toast("Không đọc được file");
     };
     reader.onload = () => {
       try {
@@ -295,62 +294,88 @@ function AddModal({ open, onClose, onAdd }) {
       } catch {
         setFileName("");
         setFileData(null);
-        alert("Không mã hóa được file torrent");
+        toast("Không mã hóa được file torrent");
       }
     };
     reader.readAsArrayBuffer(f);
   }
 
-  function submit() {
-    onAdd({ mode, magnet, fileData, startNow, skipHash });
-    resetForm();
-    onClose();
+  async function submit() {
+    if (!valid || submitting) return;
+    setSubmitting(true);
+    try {
+      const err = await onAdd({ mode, magnet, fileData, startNow, skipHash });
+      if (err) {
+        toast(err);
+        setSubmitting(false);
+        return;
+      }
+      onClose();
+    } catch (e) {
+      toast("Lỗi: " + (e?.message || e));
+      setSubmitting(false);
+    }
   }
 
   return (
-    <div className="modal-scrim" onClick={handleClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <header className="modal-head">
-          <h3>Thêm torrent mới</h3>
-          <button className="ibtn" onClick={handleClose}><Icon name="close" size={18} /></button>
-        </header>
-        <div className="seg">
-          <button className={mode === "magnet" ? "on" : ""} onClick={() => setMode("magnet")}><Icon name="magnet" size={15} /> Magnet link</button>
-          <button className={mode === "file" ? "on" : ""} onClick={() => setMode("file")}><Icon name="file" size={15} /> Tệp .torrent</button>
-        </div>
-        {mode === "magnet" ? (
-          <div className="modal-body">
-            <label className="fld-lbl">Dán magnet link</label>
-            <textarea className="magnet-in mono" placeholder="magnet:?xt=urn:btih:..." value={magnet} onChange={(e) => setMagnet(e.target.value)} autoFocus />
-            <div className="hint">Hỗ trợ BitTorrent v1 & v2 · DHT · PeX</div>
-          </div>
-        ) : (
-          <div className="modal-body">
-            <label
-              className={"dropzone" + (drag ? " over" : "") + (fileName ? " has" : "")}
-              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files[0]); }}
-            >
-              <input type="file" accept=".torrent" hidden onChange={(e) => handleFile(e.target.files[0])} />
-              <Icon name={fileName ? "check" : "upload"} size={26} />
-              <div className="dz-main">{fileName || "Kéo thả tệp .torrent vào đây"}</div>
-              <div className="dz-sub">{fileName ? "Sẵn sàng thêm" : "hoặc bấm để chọn tệp"}</div>
-            </label>
-          </div>
-        )}
-        <div className="modal-opts">
-          <label className="opt"><input type="checkbox" checked={startNow} onChange={e => setStartNow(e.target.checked)} /> Bắt đầu tải ngay</label>
-          <label className="opt"><input type="checkbox" checked={skipHash} onChange={e => setSkipHash(e.target.checked)} /> Bỏ qua kiểm tra hash</label>
-        </div>
-        <footer className="modal-foot">
-          <button className="btn ghost" onClick={handleClose}>Hủy</button>
-          <button className="btn primary" disabled={!valid} onClick={submit}>
-            <Icon name="plus" size={15} /> Thêm torrent
-          </button>
-        </footer>
+    <Dialog className="dlg-md" labelledBy="add-title" onClose={handleClose}>
+      <header className="modal-head">
+        <h3 id="add-title">Thêm torrent mới</h3>
+        <button className="ibtn" onClick={handleClose} disabled={submitting} aria-label="Đóng"><Icon name="close" size={18} /></button>
+      </header>
+      <div className="modal-seg">
+        <Segmented
+          className="seg-fill"
+          label="Cách thêm"
+          value={mode}
+          onChange={(m) => { if (!submitting) setMode(m); }}
+          items={[
+            { id: "magnet", label: "Magnet link", icon: "magnet" },
+            { id: "file", label: "Tệp .torrent", icon: "file" },
+          ]}
+        />
       </div>
-    </div>
+      {mode === "magnet" ? (
+        <div className="modal-body">
+          <label className="fld-lbl" htmlFor="magnet-input">Dán magnet link</label>
+          <textarea
+            id="magnet-input"
+            className="field field-area mono"
+            placeholder="magnet:?xt=urn:btih:..."
+            value={magnet}
+            onChange={(e) => setMagnet(e.target.value)}
+            autoFocus
+            disabled={submitting}
+          />
+          <div className="hint">Hỗ trợ BitTorrent v1 & v2 · DHT · PeX</div>
+        </div>
+      ) : (
+        <div className="modal-body">
+          <label
+            className={"dropzone" + (drag ? " over" : "") + (fileName ? " has" : "")}
+            onDragOver={(e) => { e.preventDefault(); if (!submitting) setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={(e) => { e.preventDefault(); setDrag(false); if (!submitting) handleFile(e.dataTransfer.files[0]); }}
+          >
+            <input type="file" accept=".torrent" hidden disabled={submitting} onChange={(e) => handleFile(e.target.files[0])} />
+            <Icon name={fileName ? "check" : "upload"} size={26} />
+            <div className="dz-main">{fileName || "Kéo thả tệp .torrent vào đây"}</div>
+            <div className="dz-sub">{fileName ? "Sẵn sàng thêm" : "hoặc bấm để chọn tệp"}</div>
+          </label>
+        </div>
+      )}
+      <div className="modal-opts">
+        <Switch checked={startNow} disabled={submitting} onChange={setStartNow}>Bắt đầu tải ngay</Switch>
+        <Switch checked={skipHash} disabled={submitting} onChange={setSkipHash}>Bỏ qua kiểm tra hash</Switch>
+      </div>
+      <footer className="modal-foot">
+        <button className="btn ghost" onClick={handleClose} disabled={submitting}>Hủy</button>
+        <button className="btn primary" disabled={!valid || submitting} aria-busy={submitting || undefined} onClick={submit}>
+          {submitting ? <i className="spin" aria-hidden="true" /> : <Icon name="plus" size={16} />}
+          {submitting ? "Đang thêm…" : "Thêm torrent"}
+        </button>
+      </footer>
+    </Dialog>
   );
 }
 
@@ -384,12 +409,12 @@ function SettingsModalBody({ onClose, onSaved }) {
   function save() {
     SaveSettings(settings).then(e => {
       if (e) {
-        alert(e);
+        toast(e);
       } else {
         onSaved?.(settings);
         onClose();
       }
-    }).catch(e => alert("Lỗi: " + e));
+    }).catch(e => toast("Lỗi: " + e));
   }
 
   function chooseDir() {
@@ -400,140 +425,108 @@ function SettingsModalBody({ onClose, onSaved }) {
 
   function openDir() {
     OpenDownloadDir()
-      .then(err => { if (err) alert(err); })
-      .catch(e => alert("Không mở được thư mục: " + e));
+      .then(err => { if (err) toast(err); })
+      .catch(e => toast("Không mở được thư mục: " + e));
   }
 
   const loading = !ready;
+  const set = (patch) => setSettings(s => ({ ...s, ...patch }));
 
   return (
-    <div className="modal-scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 520, maxHeight: "90vh", overflow: "auto" }}>
-        <header className="modal-head">
-          <h3>Cài đặt</h3>
-          <button className="ibtn" onClick={onClose}><Icon name="close" size={18} /></button>
-        </header>
-        {loading ? (
-          <div className="modal-body" style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Đang tải...</div>
-        ) : (
-          <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {loadError && <div className="hint" style={{ color: "var(--warn)" }}>Không tải được cài đặt: {loadError}</div>}
-            <div>
-              <label className="fld-lbl">Thư mục lưu</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input className="magnet-in" style={{ height: 38, flex: 1 }} value={settings.downloadDir || ""} onChange={e => setSettings(s => ({ ...s, downloadDir: e.target.value }))} placeholder="~/Downloads/leakdownload" />
-                <button className="btn ghost" onClick={chooseDir} style={{ height: 38 }} title="Chọn thư mục"><Icon name="folder" size={15} /> Chọn</button>
-                <button className="btn ghost" onClick={openDir} style={{ height: 38 }} title="Mở thư mục"><Icon name="globe" size={15} /> Mở</button>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label className="fld-lbl">Giới hạn tải xuống (KB/s, 0 = vô hạn)</label>
-                <input className="magnet-in" style={{ height: 38 }} type="number" min={0} value={settings.downKBps ?? 0} onChange={e => setSettings(s => ({ ...s, downKBps: Math.max(0, parseInt(e.target.value) || 0) }))} />
-              </div>
-              <div>
-                <label className="fld-lbl">Giới hạn tải lên (KB/s, 0 = vô hạn)</label>
-                <input className="magnet-in" style={{ height: 38 }} type="number" min={0} value={settings.upKBps ?? 0} onChange={e => setSettings(s => ({ ...s, upKBps: Math.max(0, parseInt(e.target.value) || 0) }))} />
-              </div>
-            </div>
+    <Dialog className="dlg-lg" labelledBy="settings-title" onClose={onClose}>
+      <header className="modal-head">
+        <h3 id="settings-title">Cài đặt</h3>
+        <button className="ibtn" onClick={onClose} aria-label="Đóng"><Icon name="close" size={18} /></button>
+      </header>
+      {loading ? (
+        <div className="modal-body settings-loading" aria-busy="true">
+          <div className="sk" style={{ height: 40 }} />
+          <div className="sk" style={{ height: 40, width: "70%" }} />
+          <div className="sk" style={{ height: 120 }} />
+        </div>
+      ) : (
+        <div className="modal-body settings-body">
+          {loadError && <div className="hint hint-warn">Không tải được cài đặt: {loadError}</div>}
 
-            <div className="settings-section">
-              <div className="fld-lbl" style={{ marginBottom: 10 }}>Hàng đợi tải</div>
+          <section className="settings-section first">
+            <h4 className="settings-h">Lưu trữ</h4>
+            <label className="fld-lbl" htmlFor="set-dir">Thư mục lưu</label>
+            <div className="field-row">
+              <input id="set-dir" className="field" value={settings.downloadDir || ""} onChange={e => set({ downloadDir: e.target.value })} placeholder="~/Downloads/leakdownload" />
+              <button className="btn ghost" onClick={chooseDir} title="Chọn thư mục"><Icon name="folder" size={15} /> Chọn</button>
+              <button className="btn ghost" onClick={openDir} title="Mở thư mục"><Icon name="folder" size={15} /> Mở</button>
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <h4 className="settings-h">Tốc độ</h4>
+            <div className="field-grid">
               <div>
-                <label className="fld-lbl">Số torrent tải song song (0 = không giới hạn)</label>
-                <input
-                  className="magnet-in"
-                  style={{ height: 38, maxWidth: 160 }}
-                  type="number"
-                  min={0}
-                  max={50}
-                  value={settings.maxActiveDownloads ?? 0}
-                  onChange={e => setSettings(s => ({
-                    ...s,
-                    maxActiveDownloads: Math.min(50, Math.max(0, parseInt(e.target.value, 10) || 0)),
-                  }))}
-                />
+                <label className="fld-lbl" htmlFor="set-down">Giới hạn tải xuống (KB/s)</label>
+                <input id="set-down" className="field" type="number" min={0} value={settings.downKBps ?? 0} onChange={e => set({ downKBps: Math.max(0, parseInt(e.target.value) || 0) })} />
               </div>
-              <div className="hint">
-                Ví dụ đặt 3: chỉ 3 torrent tải cùng lúc, còn lại ở trạng thái Hàng đợi. Khi một cái xong/tạm dừng, slot tự nhường tiếp.
+              <div>
+                <label className="fld-lbl" htmlFor="set-up">Giới hạn tải lên (KB/s)</label>
+                <input id="set-up" className="field" type="number" min={0} value={settings.upKBps ?? 0} onChange={e => set({ upKBps: Math.max(0, parseInt(e.target.value) || 0) })} />
               </div>
-              <label className="opt" style={{ marginTop: 12, display: "flex" }}>
-                <input
-                  type="checkbox"
-                  checked={settings.notifyOnComplete !== false}
-                  onChange={e => setSettings(s => ({ ...s, notifyOnComplete: e.target.checked }))}
-                />
-                Thông báo Windows khi tải xong
-              </label>
             </div>
+            <div className="hint">0 = không giới hạn.</div>
+          </section>
 
-            <div className="settings-section">
-              <div className="fld-lbl" style={{ marginBottom: 10 }}>Seed / chia sẻ</div>
-              <label className="opt" style={{ display: "flex" }}>
-                <input
-                  type="checkbox"
-                  checked={settings.blockSeed !== false}
-                  onChange={e => setSettings(s => ({ ...s, blockSeed: e.target.checked }))}
-                />
-                Chặn seed (không chia sẻ lên mạng)
-              </label>
-              <div className="hint">
-                Mặc định bật — chỉ tải về, không upload. Bỏ tick để mở seed / chia sẻ cho peer khác.
-              </div>
+          <section className="settings-section">
+            <h4 className="settings-h">Hàng đợi tải</h4>
+            <label className="fld-lbl" htmlFor="set-active">Số torrent tải song song</label>
+            <input
+              id="set-active"
+              className="field field-short"
+              type="number"
+              min={0}
+              max={50}
+              value={settings.maxActiveDownloads ?? 0}
+              onChange={e => set({ maxActiveDownloads: Math.min(50, Math.max(0, parseInt(e.target.value, 10) || 0)) })}
+            />
+            <div className="hint">
+              0 = không giới hạn. Ví dụ đặt 3: chỉ 3 torrent tải cùng lúc, còn lại ở trạng thái Hàng đợi. Khi một cái xong hoặc tạm dừng, slot tự nhường tiếp.
             </div>
+            <Switch checked={settings.notifyOnComplete !== false} onChange={v => set({ notifyOnComplete: v })}>
+              Thông báo Windows khi tải xong
+            </Switch>
+          </section>
 
-            <div className="settings-section">
-              <div className="fld-lbl" style={{ marginBottom: 10 }}>Nguồn tìm kiếm</div>
-              <div className="settings-checks">
-                <label className="opt">
-                  <input
-                    type="checkbox"
-                    checked={settings.enableApibay !== false}
-                    onChange={e => setSettings(s => ({ ...s, enableApibay: e.target.checked }))}
-                  />
-                  Nguồn công khai (APIBay)
-                </label>
-                <label className="opt">
-                  <input
-                    type="checkbox"
-                    checked={settings.enableTorrentsCSV !== false}
-                    onChange={e => setSettings(s => ({ ...s, enableTorrentsCSV: e.target.checked }))}
-                  />
-                  Torrents-CSV
-                </label>
-              </div>
-              <div style={{ marginTop: 12 }}>
-                <label className="fld-lbl">Jackett / Prowlarr URL</label>
-                <input
-                  className="magnet-in"
-                  style={{ height: 38 }}
-                  value={settings.jackettURL || ""}
-                  onChange={e => setSettings(s => ({ ...s, jackettURL: e.target.value }))}
-                  placeholder="http://127.0.0.1:9117"
-                />
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <label className="fld-lbl">API key</label>
-                <input
-                  className="magnet-in"
-                  style={{ height: 38 }}
-                  type="password"
-                  autoComplete="off"
-                  value={settings.jackettAPIKey || ""}
-                  onChange={e => setSettings(s => ({ ...s, jackettAPIKey: e.target.value }))}
-                  placeholder="API key từ Jackett / Prowlarr"
-                />
-              </div>
-              <div className="hint">Prowlarr: dán base URL + API key (Torznab / Jackett-compatible). Để trống nếu chỉ dùng nguồn công khai.</div>
+          <section className="settings-section">
+            <h4 className="settings-h">Seed / chia sẻ</h4>
+            <Switch
+              checked={settings.blockSeed !== false}
+              onChange={v => set({ blockSeed: v })}
+              hint="Mặc định bật — chỉ tải về, không upload. Tắt để mở seed / chia sẻ cho peer khác."
+            >
+              Chặn seed (không chia sẻ lên mạng)
+            </Switch>
+          </section>
+
+          <section className="settings-section">
+            <h4 className="settings-h">Nguồn tìm kiếm</h4>
+            <div className="settings-checks">
+              <Switch checked={settings.enableApibay !== false} onChange={v => set({ enableApibay: v })}>
+                Nguồn công khai (APIBay)
+              </Switch>
+              <Switch checked={settings.enableTorrentsCSV !== false} onChange={v => set({ enableTorrentsCSV: v })}>
+                Torrents-CSV
+              </Switch>
             </div>
-          </div>
-        )}
-        <footer className="modal-foot">
-          <button className="btn ghost" onClick={onClose}>Hủy</button>
-          <button className="btn primary" onClick={save} disabled={loading}><Icon name="check" size={15} /> Lưu</button>
-        </footer>
-      </div>
-    </div>
+            <label className="fld-lbl" htmlFor="set-jk">Jackett / Prowlarr URL</label>
+            <input id="set-jk" className="field" value={settings.jackettURL || ""} onChange={e => set({ jackettURL: e.target.value })} placeholder="http://127.0.0.1:9117" />
+            <label className="fld-lbl" htmlFor="set-key">API key</label>
+            <input id="set-key" className="field" type="password" autoComplete="off" value={settings.jackettAPIKey || ""} onChange={e => set({ jackettAPIKey: e.target.value })} placeholder="API key từ Jackett / Prowlarr" />
+            <div className="hint">Prowlarr: dán base URL + API key (Torznab / Jackett-compatible). Để trống nếu chỉ dùng nguồn công khai.</div>
+          </section>
+        </div>
+      )}
+      <footer className="modal-foot">
+        <button className="btn ghost" onClick={onClose}>Hủy</button>
+        <button className="btn primary" onClick={save} disabled={loading}><Icon name="check" size={16} /> Lưu</button>
+      </footer>
+    </Dialog>
   );
 }
 

@@ -3,6 +3,7 @@ import { Icon } from './icons.jsx';
 import { fmtBytes } from '../utils.js';
 import { SearchTorrents, AddMagnet } from '../wailsjs/go/main/App.js';
 import { useColumnWidths } from '../useColumnWidths.js';
+import { toast } from '../ui.js';
 
 const SEARCH_COL_DEFAULTS = {
   name: 280,
@@ -142,7 +143,7 @@ function SearchPanel({ onAdded, knownHashes }) {
     e?.preventDefault?.();
     const query = (overrideQuery != null ? overrideQuery : q).trim();
     if (query.length < 2) {
-      alert('Nhập ít nhất 2 ký tự để tìm.');
+      toast('Nhập ít nhất 2 ký tự để tìm.', 'info');
       return;
     }
     if (overrideQuery != null) setQ(query);
@@ -191,13 +192,13 @@ function SearchPanel({ onAdded, knownHashes }) {
     try {
       const err = await AddMagnet(row.magnet, true, false);
       if (err) {
-        alert(err);
+        toast(err);
       } else {
         setAdded(prev => new Set(prev).add(key));
         onAdded?.();
       }
     } catch (e) {
-      alert('Lỗi: ' + e);
+      toast('Lỗi: ' + e);
     } finally {
       setAdding(prev => {
         const n = new Set(prev);
@@ -225,13 +226,13 @@ function SearchPanel({ onAdded, knownHashes }) {
             autoFocus
           />
           {q && (
-            <button type="button" className="ibtn sm" onClick={() => setQ('')}>
+            <button type="button" className="ibtn sm" aria-label="Xóa từ khóa" onClick={() => setQ('')}>
               <Icon name="close" size={13} />
             </button>
           )}
         </div>
-        <button type="submit" className="btn primary" disabled={loading || q.trim().length < 2}>
-          <Icon name="search" size={15} />
+        <button type="submit" className="btn primary" disabled={loading || q.trim().length < 2} aria-busy={loading || undefined}>
+          {loading ? <i className="spin" aria-hidden="true" /> : <Icon name="search" size={16} />}
           {loading ? 'Đang tìm…' : 'Tìm kiếm'}
         </button>
       </form>
@@ -258,6 +259,7 @@ function SearchPanel({ onAdded, knownHashes }) {
                   type="button"
                   className="hist-chip-x"
                   title="Xóa"
+                  aria-label={`Xóa "${term}" khỏi lịch sử`}
                   onClick={() => removeHistoryItem(term)}
                 >
                   ×
@@ -284,9 +286,16 @@ function SearchPanel({ onAdded, knownHashes }) {
       )}
 
       {loading && (
-        <div className="empty search-empty">
-          <div className="spin" />
-          <p>Đang tìm trên các nguồn…</p>
+        <div className="search-table-wrap sk-wrap" aria-busy="true" role="status">
+          <span className="vh">Đang tìm trên các nguồn…</span>
+          {Array.from({ length: 9 }, (_, i) => (
+            <div className="sk-row" key={i} aria-hidden="true">
+              <div className="sk" style={{ width: `${46 + ((i * 17) % 40)}%` }} />
+              <div className="sk sk-s" />
+              <div className="sk sk-s" />
+              <div className="sk sk-s" />
+            </div>
+          ))}
         </div>
       )}
 
@@ -342,7 +351,7 @@ function SearchPanel({ onAdded, knownHashes }) {
                       <span className="name-text" title={row.name}>{row.name}</span>
                       {already && <span className="already-badge">Đã thêm</span>}
                     </td>
-                    <td className="mono num" title={row.size ? row.size + ' B' : undefined}>{row.size ? fmtBytes(row.size) : '—'}</td>
+                    <td className="mono num" title={Number.isFinite(row.size) && row.size >= 0 ? row.size + ' B' : undefined}>{Number.isFinite(row.size) && row.size >= 0 ? fmtBytes(row.size) : '—'}</td>
                     <td className="mono num" style={{ color: row.seeders > 0 ? 'var(--up)' : 'var(--muted)' }}>
                       {row.seeders ?? '—'}
                     </td>
@@ -357,8 +366,8 @@ function SearchPanel({ onAdded, knownHashes }) {
                         onClick={() => addOne(row)}
                         title={already ? 'Đã có trong danh sách' : 'Thêm torrent'}
                       >
-                        <Icon name={already ? 'check' : 'plus'} size={14} />
-                        {already ? 'Có rồi' : isAdding ? '…' : 'Thêm'}
+                        {isAdding ? <i className="spin" aria-hidden="true" /> : <Icon name={already ? 'check' : 'plus'} size={14} />}
+                        {already ? 'Có rồi' : isAdding ? 'Đang thêm' : 'Thêm'}
                       </button>
                     </td>
                   </tr>
